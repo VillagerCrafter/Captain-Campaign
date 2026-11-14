@@ -4,10 +4,12 @@
   --ink-soft: #313a32;
   --paper: #f4f2e9;
   --paper-light: #fbfaf6;
-  --forest: #17271f;
-  --forest-deep: #101914;
-  --lime: #d3ef75;
-  --lime-dark: #abc94f;
+  --forest: #1A2B49;
+  --forest-deep: #122038;
+  --lime: #FFB81C;
+  --lime-dark: #E5A410;
+  --navy: #1A2B49;
+  --gold: #FFB81C;
   --muted: #6d746a;
   --line: rgba(23, 32, 25, .16);
   --page-width: 1240px;
@@ -26,7 +28,7 @@ button, input, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
-  outline: 3px solid #6c8c20;
+  outline: 3px solid var(--gold, #FFB81C);
   outline-offset: 4px;
 }
 .page-width { width: min(var(--page-width), calc(100% - var(--page-gutter) * 2)); margin-inline: auto; }
@@ -49,8 +51,8 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
 .text-link:hover span, .button:hover span { transform: translate(3px, -2px); }
 .button { display: inline-flex; min-height: 52px; align-items: center; justify-content: center; gap: 24px; padding: 0 22px; border: 1px solid transparent; text-decoration: none; font-size: 12px; font-weight: 750; letter-spacing: .02em; transition: background .2s ease, color .2s ease, transform .2s ease; }
 .button:hover { transform: translateY(-2px); }
-.button-lime { background: var(--lime); color: var(--ink); }
-.button-lime:hover { background: #e0f6a0; }
+.button-lime { background: var(--lime); color: var(--navy); }
+.button-lime:hover { background: #ffc94a; }
 .button-outline { border-color: rgba(255,255,255,.55); color: white; }
 .button-outline:hover { background: white; color: var(--ink); }
 .button-dark { background: var(--forest); color: white; }
@@ -58,6 +60,10 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
 
 .site-header { position: absolute; z-index: 10; top: 0; left: 0; display: flex; width: 100%; height: 82px; align-items: center; justify-content: space-between; padding-inline: var(--page-gutter); color: white; border-bottom: 1px solid rgba(255,255,255,.17); }
 .brand-mark, .footer-brand { display: inline-flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; }
+.brand-logo { display: block; height: 48px; width: auto; max-width: min(200px, 42vw); object-fit: contain; }
+.brand-logo-footer { height: 42px; max-width: 180px; }
+.footer-brand { flex-direction: column; align-items: flex-start; gap: 8px; }
+.footer-byline { font-size: 10px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; opacity: .72; }
 .brand-monogram { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-family: Georgia, serif; font-size: 14px; letter-spacing: -.08em; }
 .brand-name { font-size: 10px; font-weight: 750; letter-spacing: .14em; }
 .brand-name span { display: block; margin-top: 4px; font-size: 8px; font-weight: 500; letter-spacing: .18em; opacity: .7; }
@@ -350,18 +356,17 @@ img.cms-image-missing + .project-index { z-index: 1; }
   .dialog-image { height: 190px; }
 }
 
-/* Narrow screens: dragged/absolutely-positioned edits fall back into the flow
-   so nothing overlaps text or runs off-screen. */
+/* Narrow screens: keep intentional editor offsets unless they would overflow.
+   Soften free placement instead of wiping every relative move. */
 @media (max-width: 680px) {
-  main [style*="position: relative"],
-  main img[style*="left"],
-  main video[style*="left"] {
-    position: static !important;
-    left: 0 !important;
-    top: 0 !important;
+  main [style*="position: relative"]:not([data-cms-keep-offset="true"]),
+  main img[style*="left"]:not([data-cms-keep-offset="true"]),
+  main video[style*="left"]:not([data-cms-keep-offset="true"]) {
     max-width: 100% !important;
-    width: auto !important;
-    margin-inline: auto;
+  }
+  main [data-cms-keep-offset="true"] {
+    position: relative !important;
+    max-width: 100% !important;
   }
   main img, main video, .cms-added-image, .cms-stock-image,
   .project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image {
@@ -387,6 +392,39 @@ img.cms-image-missing + .project-index { z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.site-lightbox {
+  width: min(1100px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.site-lightbox::backdrop { background: rgba(18, 32, 56, .88); }
+.site-lightbox img {
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  object-fit: contain;
+  background: #122038;
+}
+.site-lightbox-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #FFB81C;
+  color: #1A2B49;
+  font-size: 24px;
+  cursor: pointer;
+}
+.portfolio-grid img,
+.featured-slide img,
+.cms-stock-image img,
+.cms-added-image img { cursor: zoom-in; }
 
 @keyframes cmsFadeIn {
   from { opacity: 0; transform: translateY(12px); }

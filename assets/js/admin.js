@@ -1,4 +1,7 @@
 (() => {
+  const isImageElement = (element) => element?.tagName === "IMG";
+  const isVideoElement = (element) => element?.tagName === "VIDEO";
+  const isMediaElement = (element) => isImageElement(element) || isVideoElement(element);
   const TEXT_SELECTOR = [
     "h1", "h2", "h3", "h4", "p", ".brand-name", ".brand-band-heading",
     ".hero-note", ".section-number", ".story-kicker", ".step-number",
@@ -23,7 +26,7 @@
   toolbar.setAttribute("aria-label", "Website editing tools");
   toolbar.innerHTML = `
     <header class="admin-toolbar-header">
-      <div><span class="admin-toolbar-kicker">Administrator copy</span><h1>Website editor</h1></div>
+      <div><span class="admin-toolbar-kicker">Captain Campaign</span><h1>Website editor</h1></div>
       <div class="admin-header-actions"><button id="admin-collapse" type="button" aria-expanded="true">Hide tools</button><a href="/logout" aria-label="Lock administrator session" title="Lock">Lock</a></div>
     </header>
     <div id="admin-status" class="admin-status" role="status" aria-live="polite">Loading saved changes…</div>
@@ -93,6 +96,9 @@
         <button id="admin-group" type="button" disabled>Group</button>
         <button id="admin-lock" type="button" disabled>Lock</button>
       </div>
+      <label class="admin-full"><input id="admin-lock-checkbox" type="checkbox"> Element locked</label>
+      <label class="admin-full"><input id="admin-lock-parent-checkbox" type="checkbox"> Parent element locked</label>
+      <small class="admin-full">Also available in the floating right-click toolbar.</small>
       <div class="admin-button-row admin-full">
         <button id="admin-send-backward" type="button" disabled>Send backward</button>
         <button id="admin-bring-forward" type="button" disabled>Bring forward</button>
@@ -127,34 +133,100 @@
       <small class="admin-full" id="admin-media-hint">Images, videos, and uploaded fonts are saved with this project.</small>
     </fieldset>
     </details>
-    <details class="admin-tool-group">
+    <details class="admin-tool-group" data-admin-panel="position" open>
       <summary>Size and position</summary>
     <fieldset>
       ${numberBox("Width (px)", "admin-width")}
       ${numberBox("Height (px)", "admin-height")}
+      <label class="admin-full"><input id="admin-aspect-lock" type="checkbox" checked> Lock aspect ratio</label>
       ${numberBox("Font size (px)", "admin-font-size")}
-      ${numberBox("Move left (px)", "admin-left")}
-      ${numberBox("Move down (px)", "admin-top")}
+      ${numberBox("X position (px)", "admin-left")}
+      ${numberBox("Y position (px)", "admin-top")}
+      ${numberBox("Rotation (°)", "admin-rotate", "1")}
+      ${numberBox("Opacity (%)", "admin-opacity", "1")}
       <label>Layer order (front +)<input id="admin-z-index" type="number" step="1"></label>
+      <div class="admin-button-row admin-full">
+        <button id="admin-align-left" type="button" title="Align left">⟸</button>
+        <button id="admin-align-center" type="button" title="Align centre">⇔</button>
+        <button id="admin-align-right" type="button" title="Align right">⟹</button>
+      </div>
+      <div class="admin-button-row admin-full">
+        <button id="admin-align-top" type="button" title="Align top">⟰</button>
+        <button id="admin-align-middle" type="button" title="Align middle">☰</button>
+        <button id="admin-align-bottom" type="button" title="Align bottom">⟱</button>
+      </div>
+      <button class="admin-full" id="admin-distribute-h" type="button">Distribute horizontally</button>
+      <button class="admin-full" id="admin-distribute-v" type="button">Distribute vertically</button>
       <button class="admin-full" id="admin-send-to-front" type="button">Bring to front</button>
       <button class="admin-full" id="admin-send-to-back" type="button">Send to back</button>
       <button class="admin-full" id="admin-snap-even" type="button" disabled>Snap to even spacing</button>
       <button class="admin-full" id="admin-snap-section" type="button" disabled>Snap to section grid</button>
+      <label class="admin-full"><input id="admin-snap-enabled" type="checkbox" checked> Snap while dragging</label>
+      <label class="admin-full"><input id="admin-show-grid" type="checkbox"> Show grid &amp; guides</label>
       <button class="admin-full" id="admin-drag" type="button" aria-pressed="false">Drag selected element</button>
     </fieldset>
     </details>
-    <details class="admin-tool-group">
+    <details class="admin-tool-group" data-admin-panel="colors">
       <summary>Colors and effects</summary>
     <fieldset>
       <label>Text color<input id="admin-color" type="color" value="#172019"></label>
       <label>Background<input id="admin-background" type="color" value="#f4f2e9"></label>
+      <label>Border color<input id="admin-border-color" type="color" value="#1A2B49"></label>
+      ${numberBox("Corner radius", "admin-radius")}
+      ${numberBox("Border width", "admin-border-width")}
       <div class="admin-button-row admin-full">
         <button id="admin-bold" type="button" aria-pressed="false">Bold</button>
         <button id="admin-italic" type="button" aria-pressed="false">Italic</button>
         <button id="admin-underline" type="button" aria-pressed="false">Underline</button>
         <button id="admin-shadow" type="button" aria-pressed="false">Text shadow</button>
       </div>
+      <div class="admin-button-row admin-full">
+        <button id="admin-align-text-left" type="button">Left</button>
+        <button id="admin-align-text-center" type="button">Centre</button>
+        <button id="admin-align-text-right" type="button">Right</button>
+      </div>
+      ${numberBox("Line height", "admin-line-height", "0.05")}
+      ${numberBox("Letter spacing", "admin-letter-spacing", "0.1")}
     </fieldset>
+    </details>
+    <details class="admin-tool-group" data-admin-panel="seo">
+      <summary>SEO</summary>
+      <fieldset>
+        <label class="admin-full" for="admin-seo-title">Page title<input id="admin-seo-title" maxlength="70" placeholder="Captain Campaign"></label>
+        <label class="admin-full" for="admin-seo-description">Meta description<textarea id="admin-seo-description" maxlength="160" placeholder="Brand activations and memorable experiences"></textarea></label>
+        <label class="admin-full" for="admin-seo-og-image">Social share image URL<input id="admin-seo-og-image" type="url" placeholder="/assets/images/captain-campaign-logo.png"></label>
+        <label class="admin-full" for="admin-seo-canonical">Canonical path<input id="admin-seo-canonical" placeholder="/"></label>
+        <small class="admin-full">These fields update the published site head when you click Update website.</small>
+      </fieldset>
+    </details>
+    <details class="admin-tool-group" data-admin-panel="analytics">
+      <summary>Analytics</summary>
+      <fieldset>
+        <label class="admin-full" for="admin-ga4-id">GA4 measurement ID<input id="admin-ga4-id" placeholder="G-XXXXXXXXXX"></label>
+        <small class="admin-full">Create a free Google Analytics 4 property for <code>VillagerCrafter.github.io/Captain-Campaign</code>, paste the ID here, then publish and also set <code>ga4_measurement_id</code> in <code>_config.yml</code> for the live build.</small>
+        <a class="admin-full admin-external-link" id="admin-analytics-open" href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Open Google Analytics ↗</a>
+      </fieldset>
+    </details>
+    <details class="admin-tool-group" data-admin-panel="brand">
+      <summary>Brand kit</summary>
+      <fieldset>
+        <div class="admin-brand-swatches admin-full" id="admin-brand-swatches">
+          <button type="button" data-brand-color="#1A2B49" title="Navy" style="background:#1A2B49"></button>
+          <button type="button" data-brand-color="#FFB81C" title="Gold" style="background:#FFB81C"></button>
+          <button type="button" data-brand-color="#122038" title="Deep navy" style="background:#122038"></button>
+          <button type="button" data-brand-color="#f4f2e9" title="Paper" style="background:#f4f2e9"></button>
+        </div>
+        <small class="admin-full">Captain Campaign colours. Click a swatch to apply as text colour on the selection.</small>
+        <button class="admin-full" id="admin-apply-brand-theme" type="button">Apply Captain Campaign theme</button>
+        <img class="admin-full admin-brand-logo-preview" src="/assets/images/captain-campaign-logo.png" alt="Captain Campaign logo">
+      </fieldset>
+    </details>
+    <details class="admin-tool-group" data-admin-panel="layers">
+      <summary>Layers</summary>
+      <fieldset>
+        <div class="admin-full" id="admin-layers-list"></div>
+        <small class="admin-full">Drag to reorder. Click a layer to select it on the page.</small>
+      </fieldset>
     </details>
     <details class="admin-tool-group">
       <summary>Page sections</summary>
@@ -243,7 +315,7 @@
   const fontInput = byId("admin-font-file");
   const selectionName = byId("admin-selection-name");
   const main = document.querySelector("main");
-  let state = { version: 1, edits: {}, sections: [], sectionCopies: [], sectionOrder: [], projects: [], contentBlocks: [], elementCopies: [], buttons: [], mediaElements: [], groups: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null };
+  let state = { version: 1, edits: {}, sections: [], sectionCopies: [], sectionOrder: [], projects: [], contentBlocks: [], elementCopies: [], buttons: [], mediaElements: [], groups: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null, seo: {}, analytics: {}, brandKit: { colors: ["#1A2B49", "#FFB81C", "#122038", "#f4f2e9"] } };
   let selected = null;
   const selectedElements = new Set();
   let elementClipboard = null;
@@ -280,8 +352,29 @@
     }
     if ((styles.left !== undefined || styles.top !== undefined) &&
         getComputedStyle(element).position === "static") element.style.position = "relative";
+    if (styles.left !== undefined || styles.top !== undefined) element.dataset.cmsKeepOffset = "true";
     if (/^#[0-9a-f]{3,8}$/i.test(styles.color || "")) element.style.color = styles.color;
     if (/^#[0-9a-f]{3,8}$/i.test(styles.backgroundColor || "")) element.style.backgroundColor = styles.backgroundColor;
+    if (/^#[0-9a-f]{3,8}$/i.test(styles.borderColor || "")) element.style.borderColor = styles.borderColor;
+    if (styles.borderWidth !== undefined) {
+      element.style.borderWidth = `${Math.max(0, Math.min(40, Number(styles.borderWidth)))}px`;
+      element.style.borderStyle = Number(styles.borderWidth) > 0 ? "solid" : "";
+    }
+    if (styles.borderRadius !== undefined) {
+      element.style.borderRadius = `${Math.max(0, Math.min(400, Number(styles.borderRadius)))}px`;
+    }
+    if (styles.opacity !== undefined) {
+      element.style.opacity = String(Math.max(0, Math.min(1, Number(styles.opacity))));
+    }
+    if (styles.rotate !== undefined) {
+      element.style.transform = `rotate(${Math.max(-180, Math.min(180, Number(styles.rotate)))}deg)`;
+    }
+    if (styles.lineHeight !== undefined) {
+      element.style.lineHeight = String(Math.max(0.8, Math.min(3, Number(styles.lineHeight))));
+    }
+    if (styles.letterSpacing !== undefined) {
+      element.style.letterSpacing = `${Math.max(-5, Math.min(40, Number(styles.letterSpacing)))}px`;
+    }
     if (["400", "600", "700", "800"].includes(String(styles.fontWeight))) element.style.fontWeight = styles.fontWeight;
     if (styles.fontStyle === "italic") element.style.fontStyle = "italic";
     if (styles.textDecoration === "underline") element.style.textDecoration = "underline";
@@ -329,20 +422,27 @@
   };
 
   const saveField = (edit, name, value) => {
-    if (selected instanceof HTMLImageElement && (name === "width" || name === "height")) {
+    if (isImageElement(selected) && (name === "width" || name === "height")) {
       const frame = imageFrameFor(selected);
       const bounds = frame.getBoundingClientRect();
       const dimensions = { ...(edit.resize || { width: bounds.width, height: bounds.height }), [name]: value };
+      if (byId("admin-aspect-lock")?.checked) {
+        const ratio = (Number(dimensions.width) || bounds.width) / Math.max(1, Number(dimensions.height) || bounds.height || 1);
+        if (name === "width") dimensions.height = Math.round(value / ratio);
+        if (name === "height") dimensions.width = Math.round(value * ratio);
+      }
       edit.resize = dimensions;
       applyImageResize(selected, dimensions);
       byId("admin-width").value = dimensions.width;
       byId("admin-height").value = dimensions.height;
       saveDraft();
+      document.dispatchEvent(new CustomEvent("cms-selection-changed", { detail: { selected } }));
       return;
     }
     edit.styles[name] = value;
     if (selected) applyStyle(selected, edit.styles);
     saveDraft();
+    document.dispatchEvent(new CustomEvent("cms-selection-changed", { detail: { selected } }));
   };
 
   const scrollToSection = (section) => section?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -395,13 +495,13 @@
   };
 
   const imageFrameFor = (media) => {
-    if (media instanceof HTMLVideoElement) return media.closest(".hero") || media;
+    if (isVideoElement(media)) return media.closest(".hero") || media;
     return media?.closest(
       ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
     ) || media;
   };
   const applyImageResize = (media, dimensions) => {
-    if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement) || !dimensions) return;
+    if (!(isMediaElement(media)) || !dimensions) return;
     const width = Math.max(40, Math.min(2400, Number(dimensions.width) || 0));
     const height = Math.max(30, Math.min(1800, Number(dimensions.height) || 0));
     if (!width || !height) return;
@@ -422,7 +522,11 @@
         : 0;
       frame.style.left = `${offsetX}px`;
       frame.style.top = `${offsetY}px`;
-      if (offsetX || offsetY) frame.style.position = "relative";
+      if (offsetX || offsetY) {
+        frame.style.position = "relative";
+        frame.dataset.cmsKeepOffset = "true";
+        media.dataset.cmsKeepOffset = "true";
+      }
     }
     if (frame !== media) {
       media.style.width = "100%";
@@ -805,7 +909,7 @@
         element.textContent = edit.text;
         element.style.whiteSpace = "pre-line";
       }
-      if (typeof edit.alt === "string" && element instanceof HTMLImageElement) element.alt = edit.alt;
+      if (typeof edit.alt === "string" && isImageElement(element)) element.alt = edit.alt;
       if (typeof edit.href === "string" && element instanceof HTMLAnchorElement && /^(https?:|mailto:|\/|#)/i.test(edit.href)) {
         element.setAttribute("href", edit.href);
       }
@@ -817,14 +921,14 @@
         if (typeof edit.serviceExample === "string") element.dataset.serviceExample = edit.serviceExample;
       }
       if (typeof edit.media === "string" && /^\/uploads\/[\w.-]+$/.test(edit.media)) {
-        if (element instanceof HTMLImageElement) {
+        if (isImageElement(element)) {
           element.src = edit.media;
           const serviceButton = element.closest(".service-open");
           if (serviceButton) serviceButton.dataset.serviceImage = edit.media;
         }
-        if (element instanceof HTMLVideoElement) element.src = edit.media;
+        if (isVideoElement(element)) element.src = edit.media;
       }
-      if (element instanceof HTMLImageElement && (edit.resize || (edit.styles?.width && edit.styles?.height))) {
+      if (isImageElement(element) && (edit.resize || (edit.styles?.width && edit.styles?.height))) {
         edit.resize ||= { width: edit.styles.width, height: edit.styles.height };
         edit.resize.offsetX ??= edit.styles.left;
         edit.resize.offsetY ??= edit.styles.top;
@@ -887,8 +991,12 @@
     state.mediaElements ||= [];
     state.elementCopies ||= [];
     state.shapes ||= [];
+    state.seo ||= {};
+    state.analytics ||= {};
+    state.brandKit ||= { colors: ["#1A2B49", "#FFB81C", "#122038", "#f4f2e9"] };
     captureOriginalPage();
     renderEditorState();
+    if (typeof syncSeoFields === "function") syncSeoFields();
     lastHistorySnapshot = JSON.stringify(state);
     historyReady = true;
     if (!draftText) setStatus("Editor ready. Changes save in this browser.");
@@ -931,7 +1039,7 @@
 
   const applyTheme = () => {
     const themes = {
-      original: { "--site-font": '"Avenir Next", Avenir, "Segoe UI", sans-serif' },
+      original: { "--forest": "#1A2B49", "--forest-deep": "#122038", "--lime": "#FFB81C", "--lime-dark": "#E5A410", "--site-font": '"Avenir Next", Avenir, "Segoe UI", sans-serif' },
       coastal: { "--forest": "#1c3038", "--forest-deep": "#122128", "--lime": "#82d4ce", "--lime-dark": "#55a8a2", "--paper": "#f0f3ef" },
       sunset: { "--forest": "#3b2825", "--forest-deep": "#241a19", "--lime": "#f4b77a", "--lime-dark": "#d68d59", "--paper": "#f7eee7" },
       violet: { "--forest": "#302641", "--forest-deep": "#1d1728", "--lime": "#c7a6ed", "--lime-dark": "#9f7bc9", "--paper": "#f3eef8" },
@@ -1037,11 +1145,19 @@
     ["admin-duplicate", "admin-group", "admin-lock", "admin-send-backward", "admin-bring-forward"].forEach((id) => { byId(id).disabled = false; });
     byId("admin-group").textContent = selectionGroupId ? "Ungroup" : "Group";
     byId("admin-lock").textContent = edit.locked ? "Unlock" : "Lock";
+    const lockBox = byId("admin-lock-checkbox");
+    if (lockBox) lockBox.checked = Boolean(edit.locked);
+    const parentLockBox = byId("admin-lock-parent-checkbox");
+    if (parentLockBox) {
+      const parent = selected.parentElement?.closest?.("[data-cms-id]");
+      parentLockBox.checked = Boolean(parent && state.edits[parent.dataset.cmsId]?.locked);
+      parentLockBox.disabled = !parent;
+    }
     textInput.value = typeof edit.text === "string" ? edit.text : (selected.matches(TEXT_SELECTOR) ? selected.innerText : "");
     textInput.disabled = [...selectedElements].some((item) => !item.matches(TEXT_SELECTOR));
-    byId("admin-replace-media").disabled = !(selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement);
-    byId("admin-alt").disabled = !(selected instanceof HTMLImageElement);
-    byId("admin-alt").value = typeof edit.alt === "string" ? edit.alt : (selected instanceof HTMLImageElement ? selected.alt : "");
+    byId("admin-replace-media").disabled = !(isMediaElement(selected));
+    byId("admin-alt").disabled = !(isImageElement(selected));
+    byId("admin-alt").value = typeof edit.alt === "string" ? edit.alt : (isImageElement(selected) ? selected.alt : "");
     byId("admin-href").disabled = !(selected instanceof HTMLAnchorElement || selected instanceof HTMLIFrameElement);
     byId("admin-href").value = selected instanceof HTMLIFrameElement
       ? (edit.src || selected.getAttribute("src") || "")
@@ -1065,21 +1181,32 @@
     }
     byId("admin-parent").disabled = !selected.parentElement?.matches(CANDIDATE_SELECTOR);
     byId("admin-delete").disabled = selected.tagName === "MAIN";
-    const mediaCount = selectionTargets().filter((element) =>
-      element instanceof HTMLImageElement || element instanceof HTMLVideoElement).length;
+    const mediaCount = selectionTargets().filter(isMediaElement).length;
     byId("admin-snap-even").disabled = mediaCount < 2;
     byId("admin-snap-section").disabled = mediaCount < 1;
+    const setField = (id, value) => {
+      const field = byId(id);
+      if (field) field.value = value;
+    };
     for (const [id, name] of [["admin-width", "width"], ["admin-height", "height"], ["admin-font-size", "fontSize"], ["admin-left", "left"], ["admin-top", "top"], ["admin-z-index", "zIndex"]]) {
-      byId(id).value = (name === "width" || name === "height" ? edit.resize?.[name] : undefined) ?? edit.styles?.[name] ?? "";
+      setField(id, (name === "width" || name === "height" ? edit.resize?.[name] : undefined) ?? edit.styles?.[name] ?? "");
     }
-    byId("admin-color").value = edit.styles?.color || "#172019";
-    byId("admin-background").value = edit.styles?.backgroundColor || "#f4f2e9";
-    byId("admin-filter").value = edit.styles?.filter || "";
+    setField("admin-rotate", edit.styles?.rotate ?? "");
+    setField("admin-opacity", edit.styles?.opacity !== undefined ? Math.round(Number(edit.styles.opacity) * 100) : 100);
+    setField("admin-radius", edit.styles?.borderRadius ?? "");
+    setField("admin-border-width", edit.styles?.borderWidth ?? "");
+    setField("admin-border-color", edit.styles?.borderColor || "#1A2B49");
+    setField("admin-line-height", edit.styles?.lineHeight ?? "");
+    setField("admin-letter-spacing", edit.styles?.letterSpacing ?? "");
+    setField("admin-color", edit.styles?.color || "#172019");
+    setField("admin-background", edit.styles?.backgroundColor || "#f4f2e9");
+    setField("admin-filter", edit.styles?.filter || "");
     for (const [id, name] of [["admin-bold", "fontWeight"], ["admin-italic", "fontStyle"], ["admin-underline", "textDecoration"], ["admin-shadow", "textShadow"]]) {
-      byId(id).setAttribute("aria-pressed", String(Boolean(edit.styles?.[name] && edit.styles[name] !== "400")));
+      byId(id)?.setAttribute("aria-pressed", String(Boolean(edit.styles?.[name] && edit.styles[name] !== "400")));
     }
+    document.dispatchEvent(new CustomEvent("cms-selection-changed", { detail: { selected, selectedElements: [...selectedElements] } }));
   };
-  const selectionTargets = () => [...selectedElements].filter((element) => element.isConnected);
+  const selectionTargets = () => [...selectedElements].filter((element) => element && (element.isConnected || element.parentNode));
   const updateSelectedStyles = (name, value) => {
     const targets = selectionTargets();
     targets.forEach((element) => {
@@ -1223,7 +1350,7 @@
   };
 
   const resizeSelectedMedia = (dimension, value) => {
-    const targets = selectionTargets().filter((element) => element instanceof HTMLImageElement || element instanceof HTMLVideoElement);
+    const targets = selectionTargets().filter((element) => isMediaElement(element));
     if (!targets.length) return;
     targets.forEach((element) => {
       const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
@@ -1482,7 +1609,7 @@
       if (selectedElements.size > 1) {
         selectionTargets().forEach((element) => {
           const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
-          if ((element instanceof HTMLImageElement || element instanceof HTMLVideoElement) && (styleName === "width" || styleName === "height")) {
+          if ((isMediaElement(element)) && (styleName === "width" || styleName === "height")) {
             if (value === "") {
               delete edit.resize;
               for (const property of ["width", "height", "aspect-ratio", "max-width"]) imageFrameFor(element).style.removeProperty(property);
@@ -1501,7 +1628,7 @@
         saveDraft();
         return;
       }
-      if ((selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement) && (styleName === "width" || styleName === "height")) {
+      if ((isMediaElement(selected)) && (styleName === "width" || styleName === "height")) {
         const edit = currentEdit();
         if (value === "") {
           const frame = imageFrameFor(selected);
@@ -1535,9 +1662,12 @@
     });
   };
 
+  const isEditorChrome = (node) => Boolean(node?.closest?.(
+    ".admin-toolbar, .admin-properties, .admin-rail, .admin-context-menu, .admin-float-toolbar, .editor-image-context-menu, .moveable-control-box, .admin-page-edge, [data-cms-control]",
+  ));
   toolbar.addEventListener("click", (event) => event.stopPropagation());
   document.addEventListener("click", (event) => {
-    if (toolbar.contains(event.target) || event.target.closest("[data-cms-control]") || !editMode) return;
+    if (isEditorChrome(event.target) || toolbar.contains(event.target) || !editMode) return;
     const element = event.target.closest(CANDIDATE_SELECTOR);
     if (!element || element.closest(".service-dialog") || element.isContentEditable) return;
     if (element.matches("a,button")) event.preventDefault();
@@ -1548,7 +1678,7 @@
   }, true);
 
   document.addEventListener("dblclick", (event) => {
-    if (toolbar.contains(event.target) || event.target.closest("[data-cms-control]") || !editMode) return;
+    if (isEditorChrome(event.target) || toolbar.contains(event.target) || !editMode) return;
     const element = event.target.closest(CANDIDATE_SELECTOR);
     if (!element) return;
     event.preventDefault();
@@ -1556,8 +1686,8 @@
     selectElement(element);
     if (element.matches(TEXT_SELECTOR)) {
       beginTextEditing(element);
-    } else if (element instanceof HTMLImageElement || element instanceof HTMLVideoElement) {
-      requestMedia(element instanceof HTMLVideoElement ? "video" : "image");
+    } else if (isMediaElement(element)) {
+      requestMedia(isVideoElement(element) ? "video" : "image");
     }
   }, true);
 
@@ -1668,23 +1798,23 @@
     }
   });
   byId("admin-replace-media").addEventListener("click", () => {
-    if (selected) requestMedia(selected instanceof HTMLVideoElement ? "video" : "image");
+    if (selected) requestMedia(isVideoElement(selected) ? "video" : "image");
   });
   mediaInput.addEventListener("change", async () => {
     if (!selected || !mediaInput.files?.[0]) return;
     try {
       const uploaded = await uploadFile(mediaInput.files[0]);
-      const project = selected instanceof HTMLImageElement ? projectForElement(selected) : null;
+      const project = isImageElement(selected) ? projectForElement(selected) : null;
       const edit = currentEdit();
       edit.media = uploaded.url;
-      if (selected instanceof HTMLImageElement) {
+      if (isImageElement(selected)) {
         selected.src = uploaded.url;
         if (project) {
           project.image = uploaded.url;
           delete edit.media;
         }
       }
-      if (selected instanceof HTMLVideoElement) {
+      if (isVideoElement(selected)) {
         selected.src = uploaded.url;
         selected.load();
         if (selected.matches(".hero-video")) {
@@ -1712,11 +1842,144 @@
   bindNumberField("admin-left", "left");
   bindNumberField("admin-top", "top");
   bindNumberField("admin-z-index", "zIndex");
+  bindNumberField("admin-rotate", "rotate");
+  bindNumberField("admin-radius", "borderRadius");
+  bindNumberField("admin-border-width", "borderWidth");
+  bindNumberField("admin-line-height", "lineHeight");
+  bindNumberField("admin-letter-spacing", "letterSpacing");
+  byId("admin-opacity").addEventListener("input", (event) => {
+    updateSelectedStyles("opacity", Math.max(0, Math.min(100, Number(event.currentTarget.value) || 0)) / 100);
+  });
+  byId("admin-border-color").addEventListener("input", (event) => updateSelectedStyles("borderColor", event.currentTarget.value));
   byId("admin-send-to-front").addEventListener("click", () => updateSelectedStyles("zIndex", 9999));
   byId("admin-send-to-back").addEventListener("click", () => updateSelectedStyles("zIndex", -9999));
+  const alignSelection = (axis, mode) => {
+    const targets = selectionTargets();
+    if (targets.length < 2) {
+      setStatus("Select at least two elements (Shift-click) to align.", "error");
+      return;
+    }
+    const boxes = targets.map((element) => ({ element, rect: element.getBoundingClientRect() }));
+    const minLeft = Math.min(...boxes.map((item) => item.rect.left));
+    const maxRight = Math.max(...boxes.map((item) => item.rect.right));
+    const minTop = Math.min(...boxes.map((item) => item.rect.top));
+    const maxBottom = Math.max(...boxes.map((item) => item.rect.bottom));
+    const midX = (minLeft + maxRight) / 2;
+    const midY = (minTop + maxBottom) / 2;
+    boxes.forEach(({ element, rect }) => {
+      const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+      edit.styles ||= {};
+      const currentLeft = Number(edit.styles.left || 0);
+      const currentTop = Number(edit.styles.top || 0);
+      let nextLeft = currentLeft;
+      let nextTop = currentTop;
+      if (axis === "x") {
+        if (mode === "left") nextLeft = currentLeft + (minLeft - rect.left);
+        if (mode === "center") nextLeft = currentLeft + (midX - (rect.left + rect.width / 2));
+        if (mode === "right") nextLeft = currentLeft + (maxRight - rect.right);
+      } else {
+        if (mode === "top") nextTop = currentTop + (minTop - rect.top);
+        if (mode === "middle") nextTop = currentTop + (midY - (rect.top + rect.height / 2));
+        if (mode === "bottom") nextTop = currentTop + (maxBottom - rect.bottom);
+      }
+      edit.styles.left = Math.round(nextLeft);
+      edit.styles.top = Math.round(nextTop);
+      applyStyle(element, edit.styles);
+    });
+    saveDraft();
+    setStatus("Selection aligned.");
+  };
+  const distributeSelection = (axis) => {
+    const targets = selectionTargets();
+    if (targets.length < 3) {
+      setStatus("Select at least three elements to distribute.", "error");
+      return;
+    }
+    const boxes = targets.map((element) => ({
+      element,
+      rect: element.getBoundingClientRect(),
+      edit: (state.edits[element.dataset.cmsId] ||= { styles: {} }),
+    })).sort((a, b) => axis === "x" ? a.rect.left - b.rect.left : a.rect.top - b.rect.top);
+    const first = boxes[0];
+    const last = boxes[boxes.length - 1];
+    const span = axis === "x"
+      ? (last.rect.left - first.rect.left)
+      : (last.rect.top - first.rect.top);
+    const step = span / (boxes.length - 1);
+    boxes.forEach((item, index) => {
+      item.edit.styles ||= {};
+      if (axis === "x") {
+        const desired = first.rect.left + step * index;
+        item.edit.styles.left = Math.round(Number(item.edit.styles.left || 0) + (desired - item.rect.left));
+      } else {
+        const desired = first.rect.top + step * index;
+        item.edit.styles.top = Math.round(Number(item.edit.styles.top || 0) + (desired - item.rect.top));
+      }
+      applyStyle(item.element, item.edit.styles);
+    });
+    saveDraft();
+    setStatus("Selection distributed evenly.");
+  };
+  byId("admin-align-left").addEventListener("click", () => alignSelection("x", "left"));
+  byId("admin-align-center").addEventListener("click", () => alignSelection("x", "center"));
+  byId("admin-align-right").addEventListener("click", () => alignSelection("x", "right"));
+  byId("admin-align-top").addEventListener("click", () => alignSelection("y", "top"));
+  byId("admin-align-middle").addEventListener("click", () => alignSelection("y", "middle"));
+  byId("admin-align-bottom").addEventListener("click", () => alignSelection("y", "bottom"));
+  byId("admin-distribute-h").addEventListener("click", () => distributeSelection("x"));
+  byId("admin-distribute-v").addEventListener("click", () => distributeSelection("y"));
+  byId("admin-align-text-left").addEventListener("click", () => updateSelectedStyles("textAlign", "left"));
+  byId("admin-align-text-center").addEventListener("click", () => updateSelectedStyles("textAlign", "center"));
+  byId("admin-align-text-right").addEventListener("click", () => updateSelectedStyles("textAlign", "right"));
+  const syncSeoFields = () => {
+    state.seo ||= {};
+    byId("admin-seo-title").value = state.seo.title || "";
+    byId("admin-seo-description").value = state.seo.description || "";
+    byId("admin-seo-og-image").value = state.seo.ogImage || "";
+    byId("admin-seo-canonical").value = state.seo.canonical || "";
+    byId("admin-ga4-id").value = state.analytics?.ga4 || "";
+  };
+  ["admin-seo-title", "admin-seo-description", "admin-seo-og-image", "admin-seo-canonical"].forEach((id) => {
+    byId(id).addEventListener("input", (event) => {
+      state.seo ||= {};
+      const map = {
+        "admin-seo-title": "title",
+        "admin-seo-description": "description",
+        "admin-seo-og-image": "ogImage",
+        "admin-seo-canonical": "canonical",
+      };
+      state.seo[map[id]] = event.currentTarget.value;
+      saveDraft();
+    });
+  });
+  byId("admin-ga4-id").addEventListener("input", (event) => {
+    state.analytics ||= {};
+    state.analytics.ga4 = event.currentTarget.value.trim();
+    saveDraft();
+  });
+  byId("admin-apply-brand-theme").addEventListener("click", () => {
+    state.theme = "original";
+    document.documentElement.style.setProperty("--forest", "#1A2B49");
+    document.documentElement.style.setProperty("--forest-deep", "#122038");
+    document.documentElement.style.setProperty("--lime", "#FFB81C");
+    document.documentElement.style.setProperty("--lime-dark", "#E5A410");
+    byId("admin-theme").value = "original";
+    applyTheme();
+    saveDraft();
+    setStatus("Captain Campaign brand colours applied.");
+  });
+  byId("admin-brand-swatches").addEventListener("click", (event) => {
+    const swatch = event.target.closest("[data-brand-color]");
+    if (!swatch) return;
+    updateSelectedStyles("color", swatch.dataset.brandColor);
+  });
+  byId("admin-show-grid").addEventListener("change", (event) => {
+    document.body.classList.toggle("cms-show-grid", event.currentTarget.checked);
+  });
+  syncSeoFields();
 
   const snapTargets = () => selectionTargets().filter((element) =>
-    element instanceof HTMLImageElement || element instanceof HTMLVideoElement);
+    isMediaElement(element));
   const setMediaOffset = (element, offsetX, offsetY) => {
     const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
     const frame = imageFrameFor(element);
@@ -1788,7 +2051,7 @@
   byId("admin-background").addEventListener("input", (event) => updateSelectedStyles("backgroundColor", event.currentTarget.value));
   byId("admin-filter").addEventListener("change", (event) => updateSelectedStyles("filter", event.currentTarget.value || undefined));
   byId("admin-alt").addEventListener("input", (event) => {
-    if (!(selected instanceof HTMLImageElement)) return;
+    if (!(isImageElement(selected))) return;
     currentEdit().alt = event.currentTarget.value;
     selected.alt = event.currentTarget.value;
     const project = projectForElement(selected);
@@ -1860,18 +2123,44 @@
   }
   byId("admin-duplicate").addEventListener("click", () => duplicateSelected());
   byId("admin-group").addEventListener("click", () => {
-    const targets = selectionTargets();
+    assignContentIds();
+    const targets = [...selectedElements].filter(Boolean);
     if (!targets.length) return;
-    const groupId = selectionGroupId || `group-${crypto.randomUUID()}`;
+    const existingGroup = targets.map((element) => state.edits[element.dataset.cmsId]?.groupId).find(Boolean);
+    if (existingGroup || selectionGroupId) {
+      const activeGroup = selectionGroupId || existingGroup;
+      targets.forEach((element) => {
+        const edit = state.edits[element.dataset.cmsId];
+        if (edit?.groupId === activeGroup) delete edit.groupId;
+      });
+      allCandidates().forEach((element) => {
+        const edit = state.edits[element.dataset.cmsId];
+        if (edit?.groupId === activeGroup) delete edit.groupId;
+      });
+      selectionGroupId = null;
+      byId("admin-group").textContent = "Group";
+      saveDraft();
+      setStatus("Selected elements ungrouped.");
+      return;
+    }
+    if (targets.length < 2) {
+      setStatus("Shift-click at least two elements before grouping.", "error");
+      return;
+    }
+    const groupId = `group-${(globalThis.crypto || crypto).randomUUID()}`;
     targets.forEach((element) => {
       state.edits[element.dataset.cmsId] ||= { styles: {} };
-      if (selectionGroupId) delete state.edits[element.dataset.cmsId].groupId;
-      else state.edits[element.dataset.cmsId].groupId = groupId;
+      state.edits[element.dataset.cmsId].groupId = groupId;
+      selectedElements.add(element);
+      element.classList.add("cms-highlight", "cms-multi-selected");
     });
-    selectionGroupId = selectionGroupId ? null : groupId;
-    byId("admin-group").textContent = selectionGroupId ? "Ungroup" : "Group";
+    selectionGroupId = groupId;
+    byId("admin-group").textContent = "Ungroup";
     saveDraft();
-    setStatus(selectionGroupId ? "Selected elements grouped for joint movement." : "Selected elements ungrouped.");
+    setStatus(`${targets.length} elements grouped. Drag any one to move them together.`);
+    document.dispatchEvent(new CustomEvent("cms-selection-changed", {
+      detail: { selected, selectedElements: [...selectedElements] },
+    }));
   });
   byId("admin-lock").addEventListener("click", () => {
     const targets = selectionTargets();
@@ -1883,6 +2172,8 @@
       element.classList.toggle("cms-editor-locked", lock);
     });
     byId("admin-lock").textContent = lock ? "Unlock" : "Lock";
+    const lockBox = byId("admin-lock-checkbox");
+    if (lockBox) lockBox.checked = lock;
     saveDraft();
     setStatus(lock ? "Selected elements locked against dragging." : "Selected elements unlocked.");
   });
@@ -1961,7 +2252,8 @@
   });
   let dragStart = null;
   document.addEventListener("pointerdown", (event) => {
-    if (!editMode || toolbar.contains(event.target) || event.button !== 0) return;
+    if (!editMode || isEditorChrome(event.target) || toolbar.contains(event.target) || event.button !== 0) return;
+    if (event.target.closest(".moveable-control, .moveable-line, .editor-resize-handle")) return;
     const clicked = event.target.closest(CANDIDATE_SELECTOR);
     if (!clicked || clicked.closest(".service-dialog")) return;
     if (!selectedElements.has(clicked)) selectElement(clicked, { toggle: event.shiftKey });
@@ -1973,45 +2265,119 @@
     }
     const clickedGroup = clickedEdit.groupId;
     const moving = clickedGroup
-      ? selectionTargets().filter((element) => state.edits[element.dataset.cmsId]?.groupId === clickedGroup)
-      : [clicked];
+      ? [...document.querySelectorAll("[data-cms-id]")].filter((element) =>
+        state.edits[element.dataset.cmsId]?.groupId === clickedGroup && !state.edits[element.dataset.cmsId]?.locked)
+      : selectionTargets().filter((element) => !state.edits[element.dataset.cmsId]?.locked);
+    const uniqueMoving = moving.length ? moving : [clicked];
+    uniqueMoving.forEach((element) => {
+      selectedElements.add(element);
+      element.classList.add("cms-highlight");
+      element.classList.toggle("cms-multi-selected", uniqueMoving.length > 1);
+    });
     dragStart = {
       x: event.clientX,
       y: event.clientY,
-      items: moving.map((element) => {
-        const edit = state.edits[element.dataset.cmsId] || { styles: {} };
-        const target = element instanceof HTMLImageElement ? imageFrameFor(element) : element;
+      items: uniqueMoving.map((element) => {
+        const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+        const target = (isMediaElement(element))
+          ? imageFrameFor(element)
+          : element;
+        const left = Number.parseFloat(target.style.left);
+        const top = Number.parseFloat(target.style.top);
         return {
           element,
           target,
-          left: element instanceof HTMLImageElement
-            ? Number.parseFloat(target.style.left) || 0
-            : Number(edit.styles?.left || 0),
-          top: element instanceof HTMLImageElement
-            ? Number.parseFloat(target.style.top) || 0
-            : Number(edit.styles?.top || 0),
+          left: Number.isFinite(left) ? left : Number(edit.styles?.left || edit.resize?.offsetX || 0),
+          top: Number.isFinite(top) ? top : Number(edit.styles?.top || edit.resize?.offsetY || 0),
         };
       }),
     };
     event.preventDefault();
   });
+  const snapValue = (value, guides, threshold = 6) => {
+    let next = value;
+    let snapped = false;
+    guides.forEach((guide) => {
+      if (Math.abs(value - guide) <= threshold) {
+        next = guide;
+        snapped = true;
+      }
+    });
+    return { value: next, snapped };
+  };
+  const collectSnapGuides = (movingElements) => {
+    const guidesX = [];
+    const guidesY = [];
+    const section = movingElements[0]?.closest("main > section") || document.querySelector("main");
+    if (section) {
+      const rect = section.getBoundingClientRect();
+      guidesX.push(0, Math.round(rect.width / 2), Math.round(rect.width));
+      guidesY.push(0, Math.round(rect.height / 2), Math.round(rect.height));
+      for (let step = 20; step < rect.width; step += 20) guidesX.push(step);
+      for (let step = 20; step < rect.height; step += 20) guidesY.push(step);
+    }
+    [...document.querySelectorAll("[data-cms-id]")].forEach((element) => {
+      if (movingElements.includes(element) || !element.getClientRects().length) return;
+      const rect = element.getBoundingClientRect();
+      const parent = element.closest("main > section") || document.querySelector("main");
+      if (!parent) return;
+      const parentRect = parent.getBoundingClientRect();
+      guidesX.push(Math.round(rect.left - parentRect.left), Math.round(rect.left + rect.width / 2 - parentRect.left), Math.round(rect.right - parentRect.left));
+      guidesY.push(Math.round(rect.top - parentRect.top), Math.round(rect.top + rect.height / 2 - parentRect.top), Math.round(rect.bottom - parentRect.top));
+    });
+    return { guidesX, guidesY };
+  };
   document.addEventListener("pointermove", (event) => {
     if (!dragStart) return;
+    // Native drag owns free movement; Moveable handles resize/rotate only.
+    if (window.CaptainCampaignEditor?.moveableDragging) return;
+    const snapOn = byId("admin-snap-enabled")?.checked !== false;
+    const { guidesX, guidesY } = snapOn ? collectSnapGuides(dragStart.items.map((item) => item.element)) : { guidesX: [], guidesY: [] };
+    const guideLayer = document.getElementById("cms-smart-guides");
+    if (guideLayer) guideLayer.replaceChildren();
     dragStart.items.forEach(({ element, target, left: startLeft, top: startTop }) => {
+      if (state.edits[element.dataset.cmsId]?.locked) return;
       const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
-      const left = Math.round(startLeft + event.clientX - dragStart.x);
-      const top = Math.round(startTop + event.clientY - dragStart.y);
-      if (element instanceof HTMLImageElement) {
+      let left = Math.round(startLeft + event.clientX - dragStart.x);
+      let top = Math.round(startTop + event.clientY - dragStart.y);
+      if (snapOn) {
+        const snappedX = snapValue(left, guidesX);
+        const snappedY = snapValue(top, guidesY);
+        left = snappedX.value;
+        top = snappedY.value;
+        if (guideLayer && (snappedX.snapped || snappedY.snapped)) {
+          if (snappedX.snapped) {
+            const line = document.createElement("div");
+            line.className = "cms-guide-line cms-guide-x";
+            line.style.left = `${left}px`;
+            guideLayer.append(line);
+          }
+          if (snappedY.snapped) {
+            const line = document.createElement("div");
+            line.className = "cms-guide-line cms-guide-y";
+            line.style.top = `${top}px`;
+            guideLayer.append(line);
+          }
+        }
+      }
+      if (isMediaElement(element)) {
         const bounds = target.getBoundingClientRect();
         edit.resize = {
-          ...(edit.resize || { width: bounds.width, height: bounds.height }),
+          ...(edit.resize || { width: bounds.width || 400, height: bounds.height || 300 }),
           offsetX: left,
           offsetY: top,
         };
         applyImageResize(element, edit.resize);
+        target.dataset.cmsKeepOffset = "true";
+        element.dataset.cmsKeepOffset = "true";
       } else {
+        edit.styles ||= {};
         edit.styles.left = left;
         edit.styles.top = top;
+        target.style.position = "relative";
+        target.style.left = `${left}px`;
+        target.style.top = `${top}px`;
+        target.dataset.cmsKeepOffset = "true";
         applyStyle(element, edit.styles);
       }
       if (element === selected) {
@@ -2217,7 +2583,7 @@
       const distance = event.shiftKey ? 10 : 1;
       selectionTargets().forEach((element) => {
         const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
-        if (element instanceof HTMLImageElement) {
+        if (isImageElement(element)) {
           const frame = imageFrameFor(element);
           const bounds = frame.getBoundingClientRect();
           edit.resize ||= { width: bounds.width, height: bounds.height };

@@ -217,3 +217,333 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 
 .admin-add-project-button { flex: 0 0 auto; align-self: flex-end; padding: 12px 15px; border: 1px solid var(--forest); background: transparent; color: var(--forest); cursor: pointer; font-size: 11px; font-weight: 700; }
 .admin-add-project-button:hover { background: var(--forest); color: white; }
+
+/* Captain Campaign Canva-style shell */
+body.cms-canva-shell {
+  --admin-sidebar-width: 360px;
+  --admin-props-width: 280px;
+  --cc-navy: #1A2B49;
+  --cc-navy-deep: #122038;
+  --cc-gold: #FFB81C;
+  margin-right: var(--admin-props-width);
+}
+body.cms-canva-shell.cms-administrator-collapsed {
+  --admin-props-width: 0px;
+}
+body.cms-canva-shell .admin-toolbar {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  width: var(--admin-sidebar-width, 360px);
+  border-right: 1px solid #2f4568;
+  background: var(--cc-navy-deep);
+  color: #f4f2e9;
+}
+body.cms-canva-shell .admin-toolbar .admin-tool-group { min-width: 0; }
+body.cms-canva-shell .admin-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 6px;
+  border-right: 1px solid #2f4568;
+  background: #0d1830;
+  overflow: auto;
+}
+body.cms-canva-shell .admin-rail-btn {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 54px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #c9d3e3;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+body.cms-canva-shell .admin-rail-btn[aria-pressed="true"] {
+  background: rgba(255, 184, 28, .16);
+  color: var(--cc-gold);
+}
+body.cms-canva-shell .admin-rail-btn svg { width: 18px; height: 18px; }
+body.cms-canva-shell .admin-panel-host {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding: 14px 12px 20px;
+}
+body.cms-canva-shell .admin-chrome { display: grid; gap: 10px; }
+body.cms-canva-shell .admin-toolbar-header { border-bottom-color: #2f4568; }
+body.cms-canva-shell .admin-toolbar-kicker,
+body.cms-canva-shell .admin-status[data-state="saved"],
+body.cms-canva-shell .admin-tool-group > summary,
+body.cms-canva-shell .admin-header-actions a,
+body.cms-canva-shell .admin-toolbar .admin-primary { color: var(--cc-gold); }
+body.cms-canva-shell .admin-toolbar .admin-publish {
+  background: var(--cc-gold);
+  color: var(--cc-navy);
+}
+body.cms-canva-shell .admin-toolbar button {
+  border-color: #2f4568;
+  background: #1A2B49;
+}
+body.cms-canva-shell .admin-toolbar button:hover { border-color: var(--cc-gold); }
+body.cms-canva-shell .admin-tool-group {
+  border-color: #2f4568;
+  background: #15233d;
+}
+body.cms-canva-shell .admin-toolbar fieldset { border-color: #2f4568; }
+body.cms-canva-shell .admin-mark { background: rgba(26, 43, 73, .78); }
+body.cms-canva-shell .admin-mark:not(.admin-mark-active) { outline-color: var(--cc-gold); }
+body.cms-canva-shell .admin-mark:not(.admin-mark-active)::after { color: var(--cc-gold); }
+body.cms-canva-shell .cms-highlight { outline-color: var(--cc-gold) !important; }
+body.cms-canva-shell .admin-properties {
+  position: fixed;
+  z-index: 100;
+  inset: 0 0 0 auto;
+  width: var(--admin-props-width);
+  overflow: auto;
+  padding: 16px 14px 24px;
+  border-left: 1px solid #2f4568;
+  background: var(--cc-navy-deep);
+  color: #f4f2e9;
+  font: 13px/1.45 "Segoe UI", sans-serif;
+}
+body.cms-canva-shell.cms-administrator-collapsed .admin-properties { display: none; }
+body.cms-canva-shell .admin-properties-header { display: grid; gap: 4px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #2f4568; }
+body.cms-canva-shell .admin-properties-body {
+  display: grid;
+  gap: 10px;
+}
+body.cms-canva-shell .admin-properties .admin-tool-group {
+  min-width: 0;
+  border-color: #2f4568;
+  background: #15233d;
+}
+body.cms-canva-shell .admin-properties .admin-toolbar,
+body.cms-canva-shell .admin-properties button {
+  font: inherit;
+}
+body.cms-canva-shell .admin-properties button {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #2f4568;
+  background: #1A2B49;
+  color: #f4f2e9;
+  cursor: pointer;
+  text-align: left;
+}
+body.cms-canva-shell .admin-properties fieldset {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #2f4568;
+}
+body.cms-canva-shell .admin-properties label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #bbc4b6;
+  font-size: 10px;
+}
+body.cms-canva-shell .admin-properties input:not([type="color"]),
+body.cms-canva-shell .admin-properties select,
+body.cms-canva-shell .admin-properties textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #3d5678;
+  background: #fbfaf6;
+  color: #172019;
+}
+body.cms-canva-shell .admin-properties .admin-full { grid-column: 1 / -1; }
+body.cms-canva-shell .admin-properties .admin-button-row { display: flex; gap: 7px; }
+body.cms-canva-shell .admin-properties .admin-button-row > * { flex: 1; text-align: center; }
+body.cms-canva-shell .admin-properties .admin-danger { color: #ffc0b7; }
+body.cms-canva-shell #cms-smart-guides {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+}
+body.cms-canva-shell .cms-guide-line {
+  position: absolute;
+  background: var(--cc-gold);
+  opacity: .85;
+}
+body.cms-canva-shell .cms-guide-x { top: 0; bottom: 0; width: 1px; }
+body.cms-canva-shell .cms-guide-y { left: 0; right: 0; height: 1px; }
+body.cms-show-grid main {
+  background-image:
+    linear-gradient(rgba(26, 43, 73, .08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 43, 73, .08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+body.cms-canva-shell .admin-layer-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, auto);
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid #2f4568;
+}
+body.cms-canva-shell .admin-layer-row.is-active { outline: 1px solid var(--cc-gold); }
+body.cms-canva-shell .admin-layer-label { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.cms-canva-shell .admin-brand-swatches { display: flex; gap: 8px; }
+body.cms-canva-shell .admin-brand-swatches button {
+  width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  padding: 0;
+}
+body.cms-canva-shell .admin-brand-logo-preview {
+  width: 100%;
+  max-width: 180px;
+  height: auto;
+  background: white;
+  border-radius: 8px;
+}
+body.cms-canva-shell .admin-external-link {
+  color: var(--cc-gold);
+  text-decoration: none;
+  font-size: 11px;
+}
+body.cms-canva-shell .admin-context-menu {
+  position: fixed;
+  z-index: 10050;
+  display: grid;
+  min-width: 180px;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #2f4568;
+  background: var(--cc-navy-deep);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .35);
+}
+body.cms-canva-shell .admin-context-menu[hidden] { display: none; }
+body.cms-canva-shell .admin-context-menu button { text-align: left; }
+body.cms-canva-shell .moveable-control { border-color: var(--cc-navy) !important; background: var(--cc-gold) !important; }
+body.cms-canva-shell .moveable-line { background: var(--cc-gold) !important; }
+body.cms-canva-shell .moveable-direction { background: var(--cc-gold) !important; }
+@media (max-width: 760px) {
+  body.cms-canva-shell { margin-right: 0; }
+  body.cms-canva-shell .admin-properties { display: none; }
+  body.cms-canva-shell .admin-toolbar { grid-template-columns: 56px minmax(0, 1fr); }
+}
+
+.admin-float-toolbar {
+  position: fixed;
+  z-index: 10060;
+  width: min(320px, calc(100vw - 16px));
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #2f4568;
+  background: #122038;
+  color: #f4f2e9;
+  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  font: 12px/1.4 "Segoe UI", sans-serif;
+}
+.admin-float-toolbar[hidden] { display: none !important; }
+.admin-float-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2f4568;
+  color: #FFB81C;
+}
+.admin-float-header button {
+  width: 28px;
+  min-height: 28px;
+  border: 0;
+  background: #1A2B49;
+  color: #FFB81C;
+  font-size: 18px;
+  cursor: pointer;
+}
+.admin-float-body { display: grid; gap: 8px; }
+.admin-float-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-float-row button, .admin-float-row label {
+  flex: 1 1 calc(50% - 6px);
+  min-height: 32px;
+}
+.admin-float-row label { display: grid; gap: 3px; font-size: 10px; color: #c9d3e3; }
+.admin-float-row input, .admin-float-row select {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid #3d5678;
+  background: #fbfaf6;
+  color: #172019;
+}
+.admin-float-lock { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.admin-crop-axis {
+  position: fixed;
+  z-index: 10040;
+  right: calc(var(--admin-props-width, 280px) + 16px);
+  bottom: 16px;
+  display: none;
+  width: 240px;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #2f4568;
+  background: #122038;
+  color: #f4f2e9;
+}
+.admin-crop-axis.is-visible { display: grid; }
+.admin-crop-axis label { display: grid; gap: 4px; font-size: 10px; }
+.admin-page-edge {
+  position: fixed;
+  left: var(--admin-sidebar-width, 360px);
+  right: var(--admin-props-width, 280px);
+  height: 10px;
+  z-index: 90;
+  cursor: ns-resize;
+  background: linear-gradient(90deg, transparent, rgba(255,184,28,.55), transparent);
+}
+.admin-page-edge-top { top: 0; }
+.admin-page-edge-bottom { bottom: 0; }
+.admin-media-library, .admin-shape-library, .admin-chrome-tools, .admin-analytics-extra { display: grid; gap: 8px; margin-top: 10px; }
+.admin-lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 280px; overflow: auto; }
+.admin-lib-card {
+  min-height: 72px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #2f4568;
+  background: #1A2B49;
+  color: #f4f2e9;
+  cursor: pointer;
+}
+.admin-lib-card img { width: 100%; height: 72px; object-fit: cover; }
+.admin-analytics-periods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.admin-analytics-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #2f4568;
+  background: #15233d;
+  text-align: center;
+}
+.admin-analytics-card strong { color: #FFB81C; font-size: 20px; }
+.admin-booking-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid #2f4568;
+  font-size: 11px;
+}
+.cms-shape-triangle {
+  width: 160px;
+  height: 140px;
+  border: 0;
+  background: rgba(255,184,28,.55);
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+.cms-added-video video { width: min(100%, 640px); background: #122038; }

@@ -1,6 +1,11 @@
-title: Liam Bennicoff | Brand Experiences
-description: Brand activations, event marketing, hosting, and content that make brands memorable.
+title: Captain Campaign
+description: Brand activations, event marketing, hosting, and content that make brands memorable — by Liam Bennicoff.
 theme: just-the-docs
+baseurl: "/Captain-Campaign"
+url: "https://VillagerCrafter.github.io"
+
+# Optional: set after creating a GA4 property pointed at this site.
+ga4_measurement_id: ""
 
 email: liam.bennicoff@gmail.com
 booking_url: https://glowful.so/embed/DPGFTl4cQ5ubZ9Cj7hMi
@@ -26,5 +31,10 @@ exclude:
   - assets/css/admin.css
   - assets/js/admin.js
   - assets/js/admin-enhancements.js
+  - assets/js/admin-canva-shell.js
+  - assets/js/admin-power-tools.js
   - assets/data/google-fonts.json
+  - analytics.json
+  - media-library.json
+  - bookings.json
   - tests

@@ -160,6 +160,12 @@
       zIndex: (value) => String(Math.max(-9999, Math.min(9999, Number(value)))),
       color: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
       backgroundColor: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
+      borderColor: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
+      borderWidth: (value) => `${Math.max(0, Math.min(40, Number(value)))}px`,
+      borderRadius: (value) => `${Math.max(0, Math.min(400, Number(value)))}px`,
+      opacity: (value) => String(Math.max(0, Math.min(1, Number(value)))),
+      lineHeight: (value) => String(Math.max(0.8, Math.min(3, Number(value)))),
+      letterSpacing: (value) => `${Math.max(-5, Math.min(40, Number(value)))}px`,
       fontWeight: (value) => ["400", "600", "700", "800"].includes(String(value)) ? value : null,
       fontStyle: (value) => value === "italic" ? value : null,
       textDecoration: (value) => value === "underline" ? value : null,
@@ -169,6 +175,12 @@
       maxWidth: (value) => value === "none" ? value : null,
       fontFamily: (value) => ["inherit", "Georgia, serif", "Arial, sans-serif", "custom"].includes(value) ? value : null,
     };
+
+    if (styles.rotate !== undefined) {
+      element.style.transform = `rotate(${Math.max(-180, Math.min(180, Number(styles.rotate)))}deg)`;
+    }
+    if (styles.left !== undefined || styles.top !== undefined) element.dataset.cmsKeepOffset = "true";
+    if (styles.borderWidth !== undefined && Number(styles.borderWidth) > 0) element.style.borderStyle = "solid";
 
     Object.entries(styles).forEach(([name, value]) => {
       if (!Object.hasOwn(allowed, name)) return;
@@ -208,7 +220,11 @@
         : 0;
       frame.style.left = `${offsetX}px`;
       frame.style.top = `${offsetY}px`;
-      if (offsetX || offsetY) frame.style.position = "relative";
+      if (offsetX || offsetY) {
+        frame.style.position = "relative";
+        frame.dataset.cmsKeepOffset = "true";
+        media.dataset.cmsKeepOffset = "true";
+      }
     }
     if (frame !== media) {
       media.style.width = "100%";
@@ -464,7 +480,9 @@
         element.style.objectFit = ["cover", "contain", "fill"].includes(edit.crop.fit) ? edit.crop.fit : "cover";
         const x = Math.max(0, Math.min(100, Number(edit.crop.x) || 0));
         const y = Math.max(0, Math.min(100, Number(edit.crop.y) || 0));
+        const zoom = Math.max(100, Math.min(220, Number(edit.crop.zoom) || 100));
         element.style.objectPosition = `${x}% ${y}%`;
+        if (zoom !== 100) element.style.transform = `scale(${zoom / 100})`;
       }
       const legacyResize = edit.styles?.width && edit.styles?.height
         ? { width: edit.styles.width, height: edit.styles.height, offsetX: edit.styles.left, offsetY: edit.styles.top }
@@ -518,7 +536,7 @@
     });
 
     const themes = {
-      original: { "--site-font": '"Avenir Next", Avenir, "Segoe UI", sans-serif' },
+      original: { "--forest": "#1A2B49", "--forest-deep": "#122038", "--lime": "#FFB81C", "--lime-dark": "#E5A410", "--site-font": '"Avenir Next", Avenir, "Segoe UI", sans-serif' },
       coastal: { "--forest": "#1c3038", "--forest-deep": "#122128", "--lime": "#82d4ce", "--lime-dark": "#55a8a2", "--paper": "#f0f3ef" },
       sunset: { "--forest": "#3b2825", "--forest-deep": "#241a19", "--lime": "#f4b77a", "--lime-dark": "#d68d59", "--paper": "#f7eee7" },
       violet: { "--forest": "#302641", "--forest-deep": "#1d1728", "--lime": "#c7a6ed", "--lime-dark": "#9f7bc9", "--paper": "#f3eef8" },
@@ -584,6 +602,39 @@
       group.append(link);
     });
     applyHeroVideos(content.heroVideos);
+    const seo = content.seo || {};
+    if (typeof seo.title === "string" && seo.title.trim()) {
+      document.title = seo.title.trim().slice(0, 70);
+      document.querySelector('meta[property="og:title"]')?.setAttribute("content", seo.title.trim().slice(0, 70));
+      document.querySelector('meta[name="twitter:title"]')?.setAttribute("content", seo.title.trim().slice(0, 70));
+    }
+    if (typeof seo.description === "string" && seo.description.trim()) {
+      document.querySelector('meta[name="description"]')?.setAttribute("content", seo.description.trim().slice(0, 160));
+      document.querySelector('meta[property="og:description"]')?.setAttribute("content", seo.description.trim().slice(0, 160));
+      document.querySelector('meta[name="twitter:description"]')?.setAttribute("content", seo.description.trim().slice(0, 160));
+    }
+    if (typeof seo.ogImage === "string" && seo.ogImage.trim()) {
+      const imageUrl = resolveSitePath(seo.ogImage.trim());
+      document.querySelector('meta[property="og:image"]')?.setAttribute("content", imageUrl);
+      document.querySelector('meta[name="twitter:image"]')?.setAttribute("content", imageUrl);
+    }
+    if (typeof seo.canonical === "string" && seo.canonical.trim()) {
+      const link = document.querySelector('link[rel="canonical"]') || document.createElement("link");
+      link.rel = "canonical";
+      link.href = seo.canonical.startsWith("http") ? seo.canonical : `${location.origin}${siteBaseUrl}${seo.canonical.startsWith("/") ? "" : "/"}${seo.canonical}`;
+      document.head.append(link);
+    }
+    const ga4 = content.analytics?.ga4;
+    if (typeof ga4 === "string" && /^G-[A-Z0-9]+$/i.test(ga4) && !document.getElementById("cms-ga4")) {
+      const script = document.createElement("script");
+      script.id = "cms-ga4";
+      script.async = true;
+      script.src = `https://www.googletagmanager.com/gtag/js?id=${ga4}`;
+      document.head.append(script);
+      const inline = document.createElement("script");
+      inline.textContent = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config','${ga4}');`;
+      document.head.append(inline);
+    }
     document.querySelectorAll(".filter-button").forEach((button) => {
       if (button.dataset.cmsFilterBound) return;
       button.dataset.cmsFilterBound = "true";

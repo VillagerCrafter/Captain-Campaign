@@ -1066,12 +1066,97 @@
   byId("admin-add-section").addEventListener("click", () => window.setTimeout(populateTargets, 0));
   window.addEventListener("resize", populateTargets);
 
+  const galleryTools = document.createElement("details");
+  galleryTools.className = "admin-tool-group editor-tool-group";
+  galleryTools.innerHTML = `
+    <summary>Gallery &amp; templates</summary>
+    <div class="editor-feature-body">
+      <small>Portfolio images open in a lightbox on the public site. Featured work already uses the built-in carousel.</small>
+      <label for="editor-gallery-columns">Portfolio columns hint</label>
+      <select id="editor-gallery-columns">
+        <option value="auto">Auto (theme default)</option>
+        <option value="2">2 columns</option>
+        <option value="3">3 columns</option>
+        <option value="4">4 columns</option>
+      </select>
+      <button type="button" id="editor-apply-gallery-columns">Apply gallery columns</button>
+      <button type="button" id="editor-save-section-preset">Save selected section as brand preset</button>
+      <div id="editor-section-presets" class="editor-item-list"></div>
+      <small>Presets store section titles locally with the draft for reuse.</small>
+    </div>
+  `;
+  byId("editor-design-panel")?.append(galleryTools);
+  const drawPresets = () => {
+    const list = byId("editor-section-presets");
+    if (!list) return;
+    state.brandKit ||= { colors: ["#1A2B49", "#FFB81C", "#122038", "#f4f2e9"], sectionPresets: [] };
+    state.brandKit.sectionPresets ||= [];
+    list.replaceChildren(...state.brandKit.sectionPresets.map((preset, index) => {
+      const row = document.createElement("div");
+      row.className = "editor-list-row";
+      row.innerHTML = `<span>${preset.title || "Untitled preset"}</span>`;
+      const use = document.createElement("button");
+      use.type = "button";
+      use.textContent = "Use";
+      use.addEventListener("click", () => {
+        byId("admin-new-section-title").value = preset.title || "";
+        byId("admin-section-template").value = preset.template || "editorial";
+        byId("admin-add-section")?.click();
+        status("Section preset applied as a new draft section.");
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => {
+        state.brandKit.sectionPresets.splice(index, 1);
+        editor.saveDraft();
+        drawPresets();
+      });
+      row.append(use, remove);
+      return row;
+    }));
+  };
+  byId("editor-apply-gallery-columns")?.addEventListener("click", () => {
+    const columns = byId("editor-gallery-columns").value;
+    const grid = document.querySelector(".portfolio-grid");
+    if (!grid) return;
+    if (columns === "auto") grid.style.gridTemplateColumns = "";
+    else grid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    state.brandKit ||= {};
+    state.brandKit.galleryColumns = columns;
+    editor.saveDraft();
+    status("Gallery column layout saved to the draft.");
+  });
+  byId("editor-save-section-preset")?.addEventListener("click", () => {
+    const section = editor.selected?.closest("main > section");
+    if (!section) {
+      status("Select a page section first.", "error");
+      return;
+    }
+    state.brandKit ||= { colors: ["#1A2B49", "#FFB81C", "#122038", "#f4f2e9"], sectionPresets: [] };
+    state.brandKit.sectionPresets ||= [];
+    state.brandKit.sectionPresets.push({
+      title: (section.querySelector("h1,h2,h3")?.textContent || "Saved section").trim().slice(0, 80),
+      template: section.classList.contains("cms-section-layout-case-study") ? "case-study" : "editorial",
+    });
+    editor.saveDraft();
+    drawPresets();
+    status("Section saved to brand presets.");
+  });
+
   editor.ready.then(() => {
     state.buttons ||= [];
     state.mediaElements ||= [];
     state.heroVideos ||= null;
     state.googleFont ||= "";
+    state.brandKit ||= { colors: ["#1A2B49", "#FFB81C", "#122038", "#f4f2e9"], sectionPresets: [] };
     loadGoogleFonts();
     refreshEditorExtensions();
+    drawPresets();
+    if (state.brandKit.galleryColumns && state.brandKit.galleryColumns !== "auto") {
+      const grid = document.querySelector(".portfolio-grid");
+      if (grid) grid.style.gridTemplateColumns = `repeat(${state.brandKit.galleryColumns}, minmax(0, 1fr))`;
+      byId("editor-gallery-columns").value = state.brandKit.galleryColumns;
+    }
   }).catch((error) => status(`Editor tools could not load: ${error.message}`, "error"));
 })();

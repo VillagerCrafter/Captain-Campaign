@@ -149,6 +149,29 @@
   document.addEventListener("visibilitychange", startCarousel);
   startCarousel();
 
+  const lightbox = document.createElement("dialog");
+  lightbox.className = "site-lightbox";
+  lightbox.innerHTML = `
+    <button type="button" class="site-lightbox-close" aria-label="Close image">×</button>
+    <img alt="">
+  `;
+  document.body.append(lightbox);
+  const lightboxImage = lightbox.querySelector("img");
+  lightbox.querySelector(".site-lightbox-close").addEventListener("click", () => lightbox.close());
+  lightbox.addEventListener("click", (event) => {
+    if (event.target === lightbox) lightbox.close();
+  });
+  document.addEventListener("click", (event) => {
+    if (document.body.classList.contains("cms-administrator")) return;
+    const image = event.target.closest(".portfolio-grid img, .featured-slide img, .cms-stock-image img, .cms-added-image img");
+    if (!image?.src) return;
+    if (event.target.closest("a,button,.project-card[role='link']")) return;
+    event.preventDefault();
+    lightboxImage.src = image.currentSrc || image.src;
+    lightboxImage.alt = image.alt || "Portfolio image";
+    lightbox.showModal();
+  });
+
   const inquiryForm = document.querySelector("#inquiry-form");
   if (inquiryForm) {
     inquiryForm.addEventListener("submit", (event) => {
@@ -168,6 +191,17 @@
       const emailLink = `mailto:${inquiryForm.dataset.recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
       document.querySelector("#form-status").textContent = "Your email app should open with the inquiry ready to send. If it does not, email liam.bennicoff@gmail.com directly.";
+      if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+        fetch("/api/inquiries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.get("name"),
+            email: formData.get("email"),
+            project: formData.get("project"),
+          }),
+        }).catch(() => {});
+      }
       window.location.href = emailLink;
     });
   }

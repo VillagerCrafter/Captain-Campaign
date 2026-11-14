@@ -45,7 +45,23 @@ def render_site
   project_source = project_source.sub(/\A---\s*\n.*?\n---\s*\n/m, "")
   project_html = Liquid::Template.parse(project_source).render!("site" => config)
   FileUtils.mkdir_p(File.join(PREVIEW, "projects"))
+  project_admin_html = project_html.sub(
+    "</head>",
+    "    <link rel=\"stylesheet\" href=\"/admin.css\">\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/moveable@0.53.0/dist/moveable.min.js\" defer></script>\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js\" defer></script>\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js\" defer></script>\n" \
+    "    <script src=\"/admin.js\" defer></script>\n" \
+    "    <script src=\"/admin-enhancements.js\" defer></script>\n" \
+    "    <script src=\"/admin-canva-shell.js\" defer></script>\n" \
+    "    <script src=\"/admin-power-tools.js\" defer></script>\n" \
+    "  </head>",
+  ).sub(
+    "<body class=\"case-study-page\">",
+    "<body class=\"case-study-page cms-administrator\"><span class=\"admin-mark admin-mark-active\">CAPTAIN CAMPAIGN EDITOR</span>",
+  )
   File.write(File.join(PREVIEW, "projects", "index.html"), project_html)
+  File.write(File.join(PREVIEW, "projects", "admin.html"), project_admin_html)
   FileUtils.cp_r(File.join(ROOT, "assets"), PREVIEW)
   FileUtils.rm_f(File.join(PREVIEW, "assets", "js", "admin.js"))
   FileUtils.rm_f(File.join(PREVIEW, "assets", "js", "admin-enhancements.js"))
@@ -53,19 +69,33 @@ def render_site
   FileUtils.rm_f(File.join(PREVIEW, "assets", "data", "google-fonts.json"))
   FileUtils.cp(File.join(ROOT, "assets", "js", "admin.js"), PREVIEW)
   FileUtils.cp(File.join(ROOT, "assets", "js", "admin-enhancements.js"), PREVIEW)
+  FileUtils.cp(File.join(ROOT, "assets", "js", "admin-canva-shell.js"), PREVIEW)
+  FileUtils.cp(File.join(ROOT, "assets", "js", "admin-power-tools.js"), PREVIEW)
   FileUtils.cp(File.join(ROOT, "assets", "data", "google-fonts.json"), PREVIEW)
 
   admin_html = html.sub(
     "</head>",
-    "    <link rel=\"stylesheet\" href=\"/admin.css\">\n    <script src=\"/admin.js\" defer></script>\n    <script src=\"/admin-enhancements.js\" defer></script>\n  </head>",
+    "    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css\">\n" \
+    "    <link rel=\"stylesheet\" href=\"/admin.css\">\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/moveable@0.53.0/dist/moveable.min.js\" defer></script>\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js\" defer></script>\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js\" defer></script>\n" \
+    "    <script src=\"https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js\" defer></script>\n" \
+    "    <script src=\"/admin.js\" defer></script>\n" \
+    "    <script src=\"/admin-enhancements.js\" defer></script>\n" \
+    "    <script src=\"/admin-canva-shell.js\" defer></script>\n" \
+    "    <script src=\"/admin-power-tools.js\" defer></script>\n" \
+    "  </head>",
   ).sub(
     '<div class="hero-shade" aria-hidden="true"></div>',
-    '<div class="hero-shade" aria-hidden="true"></div><span class="admin-mark">ADMINISTRATOR COPY</span>',
+    '<div class="hero-shade" aria-hidden="true"></div><span class="admin-mark">CAPTAIN CAMPAIGN EDITOR</span>',
   )
   File.write(File.join(PREVIEW, "admin.html"), admin_html)
   FileUtils.cp(File.join(ROOT, "assets", "css", "admin.css"), PREVIEW)
   FileUtils.cp(File.join(ROOT, "assets", "js", "admin.js"), PREVIEW)
   FileUtils.cp(File.join(ROOT, "assets", "js", "admin-enhancements.js"), PREVIEW)
+  FileUtils.cp(File.join(ROOT, "assets", "js", "admin-canva-shell.js"), PREVIEW)
+  FileUtils.cp(File.join(ROOT, "assets", "js", "admin-power-tools.js"), PREVIEW)
 
   content_path = File.join(ROOT, "site-content.json")
   content = File.file?(content_path) ? File.read(content_path) : "{}"
@@ -158,14 +188,15 @@ server.mount_proc("/admin") do |request, response|
         <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>Administrator sign in</title>
         <style>
-          *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101914;color:#f4f2e9;font:16px/1.5 "Segoe UI",sans-serif}
-          main{width:min(420px,calc(100% - 32px));padding:38px;background:#17271f;border:1px solid #53634f}
+          *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#122038;color:#f4f2e9;font:16px/1.5 "Segoe UI",sans-serif}
+          main{width:min(420px,calc(100% - 32px));padding:38px;background:#1A2B49;border:1px solid #2f4568}
           h1{margin-top:0;font:500 30px Georgia,serif}p{color:#c3cabe;font-size:14px}
-          label{display:block;margin:24px 0 8px;font-size:12px}input{width:100%;padding:13px;border:1px solid #82907c;background:#f8f8f1;color:#172019;font-size:16px}
-          button{margin-top:20px;padding:13px 18px;border:0;background:#d3ef75;color:#172019;font-weight:700;cursor:pointer}
+          label{display:block;margin:24px 0 8px;font-size:12px}input{width:100%;padding:13px;border:1px solid #3d5678;background:#f8f8f1;color:#172019;font-size:16px}
+          button{margin-top:20px;padding:13px 18px;border:0;background:#FFB81C;color:#1A2B49;font-weight:700;cursor:pointer}
           .error{color:#ffb4a9}small{display:block;margin-top:18px;color:#aab3a5}
+          .brand{display:block;width:min(220px,100%);height:auto;margin-bottom:18px}
         </style>
-        <main><span>LIAM BENNICOFF / ADMIN</span><h1>Administrator sign in</h1>
+        <main><img class="brand" src="/assets/images/captain-campaign-logo.png" alt="Captain Campaign"><span>CAPTAIN CAMPAIGN / ADMIN</span><h1>Administrator sign in</h1>
         <p>This private editor runs only on this computer.</p>
         <form action="/login" method="post"><label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
@@ -182,6 +213,8 @@ end
 {
   "/admin.js" => ["admin.js", "text/javascript; charset=utf-8"],
   "/admin-enhancements.js" => ["admin-enhancements.js", "text/javascript; charset=utf-8"],
+  "/admin-canva-shell.js" => ["admin-canva-shell.js", "text/javascript; charset=utf-8"],
+  "/admin-power-tools.js" => ["admin-power-tools.js", "text/javascript; charset=utf-8"],
   "/admin.css" => ["admin.css", "text/css; charset=utf-8"],
   "/admin.html" => ["admin.html", "text/html; charset=utf-8"],
   "/google-fonts.json" => ["google-fonts.json", "application/json; charset=utf-8"],
@@ -239,9 +272,126 @@ server.mount_proc("/logout") do |request, response|
   response["Location"] = "/admin"
 end
 
+ANALYTICS_PATH = File.join(ROOT, "analytics.json")
+MEDIA_LIBRARY_PATH = File.join(ROOT, "media-library.json")
+BOOKINGS_PATH = File.join(ROOT, "bookings.json")
+
+def load_json_file(path, fallback)
+  return fallback unless File.file?(path)
+
+  JSON.parse(File.read(path))
+rescue JSON::ParserError
+  fallback
+end
+
+def analytics_summary(visits)
+  now = Time.now.to_i
+  buckets = {
+    "day1" => now - 86_400,
+    "day7" => now - 7 * 86_400,
+    "day14" => now - 14 * 86_400,
+    "day30" => now - 30 * 86_400,
+    "day90" => now - 90 * 86_400,
+  }
+  summary = { "all" => visits.length }
+  buckets.each do |key, since|
+    summary[key] = visits.count { |visit| visit.is_a?(Hash) && visit["t"].to_i >= since }
+  end
+  summary
+end
+
+server.mount_proc("/api/inquiries") do |request, response|
+  if request.request_method != "POST"
+    json_response(response, 405, { error: "Use POST." })
+    next
+  end
+  begin
+    payload = JSON.parse(request.body.to_s.empty? ? "{}" : request.body)
+    entry = {
+      "id" => SecureRandom.uuid,
+      "name" => payload["name"].to_s[0, 120],
+      "email" => payload["email"].to_s[0, 180],
+      "type" => "inquiry",
+      "amount" => "",
+      "date" => Time.now.strftime("%Y-%m-%d"),
+      "notes" => payload["project"].to_s[0, 2000],
+    }
+    bookings = load_json_file(BOOKINGS_PATH, [])
+    bookings = [] unless bookings.is_a?(Array)
+    bookings << entry
+    atomic_write(BOOKINGS_PATH, JSON.pretty_generate(bookings) + "\n")
+    json_response(response, 201, { ok: true })
+  rescue StandardError => error
+    warn "Could not save inquiry: #{error.message}"
+    json_response(response, 500, { error: "Could not save inquiry." })
+  end
+end
+
+server.mount_proc("/api/analytics/visit") do |request, response|
+  if request.request_method != "POST"
+    json_response(response, 405, { error: "Use POST." })
+    next
+  end
+  visits = load_json_file(ANALYTICS_PATH, [])
+  visits = [] unless visits.is_a?(Array)
+  visits << { "t" => Time.now.to_i, "path" => request.query["path"].to_s[0, 200], "ref" => request["Referer"].to_s[0, 300] }
+  visits = visits.last(20_000)
+  atomic_write(ANALYTICS_PATH, JSON.pretty_generate(visits) + "\n")
+  json_response(response, 201, { ok: true })
+rescue StandardError => error
+  warn "Could not record visit: #{error.message}"
+  json_response(response, 500, { error: "Could not record visit." })
+end
+
 server.mount_proc("/api/") do |request, response|
+  if request.request_method == "GET" && request.path == "/api/analytics/summary"
+    visits = load_json_file(ANALYTICS_PATH, [])
+    visits = [] unless visits.is_a?(Array)
+    json_response(response, 200, analytics_summary(visits))
+    next
+  end
+
   unless request_session(request, sessions)
     json_response(response, 401, { error: "Your administrator session expired. Sign in again." })
+    next
+  end
+
+  if request.request_method == "GET" && request.path == "/api/media-library"
+    library = load_json_file(MEDIA_LIBRARY_PATH, { "folders" => { "Inbox" => [] }, "activeFolder" => "Inbox" })
+    json_response(response, 200, { library: library })
+    next
+  elsif request.request_method == "POST" && request.path == "/api/media-library"
+    begin
+      payload = JSON.parse(request.body)
+      library = payload["library"]
+      raise "invalid" unless library.is_a?(Hash) && library["folders"].is_a?(Hash)
+
+      atomic_write(MEDIA_LIBRARY_PATH, JSON.pretty_generate(library) + "\n")
+      json_response(response, 200, { ok: true })
+    rescue StandardError
+      json_response(response, 400, { error: "Could not save the media library." })
+    end
+    next
+  elsif request.request_method == "GET" && request.path == "/api/bookings"
+    bookings = load_json_file(BOOKINGS_PATH, [])
+    bookings = [] unless bookings.is_a?(Array)
+    json_response(response, 200, { bookings: bookings })
+    next
+  elsif request.request_method == "POST" && request.path == "/api/bookings"
+    begin
+      payload = JSON.parse(request.body)
+      bookings = payload["bookings"]
+      raise "invalid" unless bookings.is_a?(Array)
+      if payload["append"]
+        existing = load_json_file(BOOKINGS_PATH, [])
+        existing = [] unless existing.is_a?(Array)
+        bookings = existing + bookings
+      end
+      atomic_write(BOOKINGS_PATH, JSON.pretty_generate(bookings) + "\n")
+      json_response(response, 200, { ok: true })
+    rescue StandardError
+      json_response(response, 400, { error: "Could not save bookings." })
+    end
     next
   end
 
