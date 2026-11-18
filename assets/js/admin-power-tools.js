@@ -20,11 +20,12 @@
     float.innerHTML = `
       <header class="admin-float-header" data-float-drag="true">
         <strong>Edit tools</strong>
-        <button type="button" id="admin-float-close" aria-label="Close toolbar">×</button>
+        <button type="button" id="admin-float-close" aria-label="Close edit tools">×</button>
       </header>
+      <p class="admin-float-close-hint">Close only with × — this panel stays open until you dismiss it.</p>
       <div class="admin-float-body">
-        <label class="admin-float-lock"><input type="checkbox" id="admin-float-lock-checkbox"> Locked</label>
-        <label class="admin-float-lock"><input type="checkbox" id="admin-float-lock-parent-checkbox"> Parent locked</label>
+        <label class="admin-float-lock" data-for="any"><input type="checkbox" id="admin-float-lock-checkbox"> Locked</label>
+        <label class="admin-float-lock" data-for="any"><input type="checkbox" id="admin-float-lock-parent-checkbox"> Parent locked</label>
         <div class="admin-float-row" data-for="text">
           <button type="button" data-float="bold"><b>B</b></button>
           <button type="button" data-float="italic"><i>I</i></button>
@@ -48,54 +49,144 @@
           <label>BG<input id="admin-float-bg" type="color" value="#f4f2e9"></label>
           <label>Color<input id="admin-float-color" type="color" value="#172019"></label>
         </div>
-        <div class="admin-float-row" data-for="any">
+        <div class="admin-float-row" data-for="media,shape,block">
           <label>X<input id="admin-float-x" type="number"></label>
           <label>Y<input id="admin-float-y" type="number"></label>
           <label>W<input id="admin-float-w" type="number"></label>
           <label>H<input id="admin-float-h" type="number"></label>
         </div>
+        <div class="admin-float-row" data-for="section">
+          <label>Section length<input id="admin-float-section-height" type="number" min="120" max="4000" step="10"></label>
+          <button type="button" data-float="section-taller">＋ Longer</button>
+          <button type="button" data-float="section-shorter">− Shorter</button>
+        </div>
         <div class="admin-float-row" data-for="media">
-          <button type="button" data-float="crop">Crop</button>
+          <button type="button" data-float="replace">Replace</button>
           <button type="button" data-float="resize">Resize</button>
           <button type="button" data-float="recolor">Recolor</button>
           <label>Tint<input id="admin-float-tint" type="color" value="#1A2B49"></label>
         </div>
+        <div class="admin-float-row" data-for="image">
+          <button type="button" data-float="crop">Crop</button>
+        </div>
+        <small data-for="media">Resize stays off until you click it. Replace uploads a new photo or video.</small>
+        <small data-for="image">Crop tip: drag to pan focus; scroll wheel zooms crop; use axis sliders in Design tools.</small>
         <div class="admin-float-row" data-for="any">
           <button type="button" data-float="duplicate">Duplicate</button>
           <button type="button" data-float="group">Group</button>
+          <button type="button" data-float="front">Front</button>
+          <button type="button" data-float="back">Back</button>
           <button type="button" data-float="delete">Delete</button>
         </div>
-        <small data-for="media">Crop tip: drag to pan focus; scroll wheel zooms crop; use X/Y sliders for axis crop.</small>
+        <small data-for="section">Drag the gold handle on the section, or use Section length here.</small>
       </div>
     `;
     document.body.append(float);
 
     let floatDrag = null;
+    const closeFloat = () => {
+      float.hidden = true;
+      float.style.display = "none";
+    };
+
+    const chromeRects = () => {
+      const rects = [];
+      document.querySelectorAll(".admin-toolbar, .admin-properties, .admin-rail").forEach((node) => {
+        if (node.hidden || node.getClientRects?.().length === 0) return;
+        rects.push(node.getBoundingClientRect());
+      });
+      return rects;
+    };
+
+    const overlapsRect = (left, top, width, height, pad = 12) => {
+      const box = { left: left - pad, top: top - pad, right: left + width + pad, bottom: top + height + pad };
+      return chromeRects().some((rect) =>
+        box.left < rect.right && box.right > rect.left && box.top < rect.bottom && box.bottom > rect.top);
+    };
+
+    const placeFloat = (preferredX, preferredY) => {
+      const width = Math.min(320, window.innerWidth - 16);
+      const height = Math.min(float.offsetHeight || 280, window.innerHeight - 24);
+      const props = document.querySelector(".admin-properties");
+      const rail = document.querySelector(".admin-rail") || document.querySelector(".admin-toolbar");
+      const rightLimit = props && !props.hidden
+        ? Math.max(16, props.getBoundingClientRect().left - width - 16)
+        : window.innerWidth - width - 8;
+      const leftLimit = rail && !rail.hidden
+        ? Math.min(rightLimit, rail.getBoundingClientRect().right + 12)
+        : 8;
+      let left = Math.max(leftLimit, Math.min(preferredX, rightLimit));
+      let top = Math.max(8, Math.min(preferredY, window.innerHeight - height - 8));
+      if (overlapsRect(left, top, width, height)) {
+        left = Math.max(8, Math.min(leftLimit, rightLimit));
+        top = Math.max(8, Math.min(120, window.innerHeight - height - 8));
+      }
+      if (overlapsRect(left, top, width, height)) {
+        left = 16;
+        top = 72;
+      }
+      float.style.left = `${left}px`;
+      float.style.top = `${top}px`;
+      float.style.right = "auto";
+    };
+
     float.querySelector("[data-float-drag]")?.addEventListener("pointerdown", (event) => {
-      floatDrag = { x: event.clientX, y: event.clientY, left: float.offsetLeft, top: float.offsetTop };
+      // Close button lives in the drag header — never start a drag from it.
+      if (event.target.closest("#admin-float-close, button")) return;
+      const rect = float.getBoundingClientRect();
+      floatDrag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
       event.currentTarget.setPointerCapture(event.pointerId);
     });
     float.querySelector("[data-float-drag]")?.addEventListener("pointermove", (event) => {
       if (!floatDrag) return;
-      float.style.left = `${Math.max(8, floatDrag.left + event.clientX - floatDrag.x)}px`;
-      float.style.top = `${Math.max(8, floatDrag.top + event.clientY - floatDrag.y)}px`;
-      float.style.right = "auto";
+      const nextLeft = floatDrag.left + event.clientX - floatDrag.x;
+      const nextTop = floatDrag.top + event.clientY - floatDrag.y;
+      placeFloat(nextLeft, nextTop);
     });
     float.querySelector("[data-float-drag]")?.addEventListener("pointerup", () => { floatDrag = null; });
-    byId("admin-float-close").addEventListener("click", () => { float.hidden = true; });
+    byId("admin-float-close").addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeFloat();
+    });
+    byId("admin-float-close").addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeFloat();
+    });
+    // Intentionally no outside-click / Escape close — × is the only dismiss path.
 
     const syncFloat = () => {
       const selected = editor.selected;
-      if (!selected) return;
+      if (!selected) {
+        float.querySelectorAll("[data-for]").forEach((node) => { node.hidden = true; });
+        return;
+      }
       const edit = state.edits[selected.dataset.cmsId] || {};
-      const isText = selected.matches?.("h1,h2,h3,h4,p,a,span,button,li,.brand-name,.section-number");
-      const isMedia = selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement;
+      const kind = editor.selectionKind?.(selected)
+        || (selected.tagName === "SECTION" ? "section"
+          : (selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement) ? "media"
+            : selected.matches?.("h1,h2,h3,h4,p,a,span,button,li,.brand-name,.section-number") ? "text"
+              : "any");
+      const tokens = new Set([kind, "any"]);
+      if (kind === "link") tokens.add("text");
+      if (kind === "media" && selected instanceof HTMLImageElement) tokens.add("image");
       float.querySelectorAll("[data-for]").forEach((node) => {
-        const kind = node.getAttribute("data-for");
-        node.hidden = kind === "text" ? !isText : kind === "media" ? !isMedia : false;
+        const allowed = String(node.getAttribute("data-for") || "")
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean);
+        const show = allowed.some((token) => tokens.has(token));
+        node.hidden = !show;
       });
       byId("admin-float-lock-checkbox").checked = Boolean(edit.locked);
       if (byId("admin-lock-checkbox")) byId("admin-lock-checkbox").checked = Boolean(edit.locked);
+      const parent = selected.parentElement?.closest?.("[data-cms-id]");
+      const parentLock = byId("admin-float-lock-parent-checkbox");
+      if (parentLock) {
+        parentLock.checked = Boolean(parent && state.edits[parent.dataset.cmsId]?.locked);
+        parentLock.disabled = !parent;
+      }
       byId("admin-float-size").value = edit.styles?.fontSize || "";
       byId("admin-float-letter").value = edit.styles?.letterSpacing || "";
       byId("admin-float-line").value = edit.styles?.lineHeight || "";
@@ -106,15 +197,55 @@
       byId("admin-float-y").value = edit.resize?.offsetY ?? edit.styles?.top ?? "";
       byId("admin-float-w").value = edit.resize?.width ?? edit.styles?.width ?? "";
       byId("admin-float-h").value = edit.resize?.height ?? edit.styles?.height ?? "";
+      const sectionHeight = byId("admin-float-section-height");
+      if (sectionHeight) {
+        sectionHeight.value = edit.styles?.minHeight
+          || Math.round(selected.getBoundingClientRect?.().height || 0)
+          || "";
+      }
     };
 
     const openFloat = (clientX, clientY) => {
+      if (!editor.selected) {
+        editor.setStatus?.("Select something on the page first, then open Edit tools.", "error");
+        return;
+      }
       float.hidden = false;
-      float.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - 340))}px`;
-      float.style.top = `${Math.max(8, Math.min(clientY, window.innerHeight - 280))}px`;
-      float.style.right = "auto";
+      float.removeAttribute("hidden");
+      float.style.display = "grid";
+      float.style.visibility = "visible";
+      float.style.opacity = "1";
+      float.style.pointerEvents = "auto";
+      float.style.zIndex = "10060";
       syncFloat();
+      // Measure after content visibility changes, then park clear of sidebars.
+      window.requestAnimationFrame(() => placeFloat(clientX ?? 40, clientY ?? 120));
     };
+    document.addEventListener("cms-selection-changed", () => {
+      if (!float.hidden) syncFloat();
+    });
+    editor.openFloatToolbar = openFloat;
+    document.addEventListener("cms-open-float-toolbar", (event) => {
+      const { clientX = 40, clientY = 120, element } = event.detail || {};
+      if (element) editor.selectElement(element);
+      openFloat(clientX, clientY);
+    });
+    // Fallback: double-click media anywhere opens the float toolbar even if admin.js missed it.
+    document.addEventListener("dblclick", (event) => {
+      if (!document.body.classList.contains("cms-administrator")) return;
+      if (event.target.closest(".admin-toolbar, .admin-properties, .admin-rail, .admin-float-toolbar")) return;
+      const media = event.target.closest("img, video")
+        || event.target.closest(".project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image, .dialog-image")?.querySelector("img, video");
+      if (!media) return;
+      event.preventDefault();
+      event.stopPropagation();
+      editor.selectElement(media);
+      openFloat(event.clientX, event.clientY);
+    }, true);
+
+    // Do NOT auto-open Edit tools on single-click — it blocked service card editing.
+    // Double-click (above) and right-click (below) still open the float toolbar.
+    editor.closeFloatToolbar = closeFloat;
 
     document.addEventListener("contextmenu", (event) => {
       if (!document.body.classList.contains("cms-administrator")) return;
@@ -163,31 +294,106 @@
         shadow: () => byId("admin-shadow")?.click(),
         duplicate: () => byId("admin-duplicate")?.click(),
         group: () => byId("admin-group")?.click(),
+        front: () => byId("admin-send-to-front")?.click(),
+        back: () => byId("admin-send-to-back")?.click(),
         delete: () => byId("admin-delete")?.click(),
+        replace: () => {
+          const button = document.getElementById("admin-replace-media");
+          if (!button || button.disabled || button.classList.contains("admin-relevant-hidden")) {
+            editor.setStatus("Select an image or video before replacing media.", "error");
+            return;
+          }
+          button.click();
+        },
         crop: () => {
-          document.getElementById("editor-image-crop-mode")?.click();
+          let media = editor.selected;
+          if (!(media instanceof HTMLImageElement)) {
+            media = media?.closest?.(".project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image, .dialog-image")?.querySelector("img")
+              || media?.querySelector?.("img")
+              || document.getElementById("dialog-image");
+            if (media) editor.selectElement(media);
+          }
+          if (!(media instanceof HTMLImageElement)) {
+            editor.setStatus("Crop works on images only. Select a photo first.", "error");
+            return;
+          }
+          if (typeof editor.setImageTool === "function") editor.setImageTool("crop");
+          else {
+            const button = document.getElementById("editor-image-crop-mode");
+            if (button) { button.disabled = false; button.click(); }
+          }
           editor.setStatus("Crop mode: drag to pan, scroll to zoom, use axis sliders.");
         },
-        resize: () => document.getElementById("editor-image-resize-mode")?.click(),
+        resize: () => {
+          let media = editor.selected;
+          if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement)) {
+            media = media?.closest?.(".project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image")?.querySelector("img, video")
+              || media?.querySelector?.("img, video");
+            if (media) editor.selectElement(media);
+          }
+          if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement)) {
+            editor.setStatus("Select an image or video first to resize it.", "error");
+            return;
+          }
+          if (typeof editor.setImageTool === "function") {
+            editor.setImageTool("resize");
+          } else {
+            const button = document.getElementById("editor-image-resize-mode");
+            if (button) {
+              button.disabled = false;
+              button.click();
+            }
+          }
+          // Fallback: nudge size via numeric fields so Resize always does something visible.
+          if (media instanceof HTMLImageElement || media instanceof HTMLVideoElement) {
+            const bounds = (editor.imageFrameFor?.(media) || media).getBoundingClientRect();
+            const edit = state.edits[media.dataset.cmsId] ||= { styles: {} };
+            edit.resize = {
+              width: Math.round(edit.resize?.width || bounds.width || 400),
+              height: Math.round(edit.resize?.height || bounds.height || 300),
+              offsetX: edit.resize?.offsetX || 0,
+              offsetY: edit.resize?.offsetY || 0,
+            };
+            editor.applyImageResize?.(media, edit.resize);
+            if (byId("admin-width")) byId("admin-width").value = edit.resize.width;
+            if (byId("admin-height")) byId("admin-height").value = edit.resize.height;
+            editor.saveDraft();
+          }
+          editor.setStatus("Resize mode: drag the yellow handles around the image.");
+        },
         recolor: () => {
+          if (!(editor.selected instanceof HTMLImageElement || editor.selected instanceof HTMLVideoElement)) {
+            editor.setStatus("Recolor applies to images and videos.", "error");
+            return;
+          }
           const tint = byId("admin-float-tint").value;
           const edit = state.edits[editor.selected.dataset.cmsId] ||= { styles: {} };
+          edit.styles ||= {};
           edit.styles.filter = "contrast(1.08) saturate(1.2)";
           edit.styles.borderColor = tint;
           edit.styles.borderWidth = 3;
-          editor.selected.style.filter = edit.styles.filter;
-          editor.selected.style.outline = `3px solid ${tint}`;
+          editor.applyStyle?.(editor.selected, edit.styles);
           editor.saveDraft();
         },
         echo: () => {
+          const kind = editor.selectionKind?.(editor.selected);
+          if (kind !== "text" && kind !== "link") {
+            editor.setStatus("Echo shadow applies to text.", "error");
+            return;
+          }
           const edit = state.edits[editor.selected.dataset.cmsId] ||= { styles: {} };
-          edit.styles.textShadow = "1";
-          editor.selected.style.textShadow = "0 0 1px currentColor, 2px 2px 0 rgba(26,43,73,.35), 4px 4px 0 rgba(255,184,28,.35)";
+          edit.styles ||= {};
+          edit.styles.textShadow = "echo";
+          editor.applyStyle?.(editor.selected, edit.styles);
           editor.saveDraft();
         },
         bullet: () => {
           const selected = editor.selected;
-          if (!selected) return;
+          const kind = editor.selectionKind?.(selected);
+          if (!selected || (kind !== "text" && kind !== "link")) {
+            editor.setStatus("List formatting applies to text.", "error");
+            return;
+          }
           const edit = state.edits[selected.dataset.cmsId] ||= { styles: {} };
           const lines = selected.textContent.split(/\n+/).map((line) => line.replace(/^[•\-]\s*/, "").trim()).filter(Boolean);
           edit.text = lines.map((line) => `• ${line}`).join("\n");
@@ -195,9 +401,30 @@
           selected.style.whiteSpace = "pre-line";
           editor.saveDraft();
         },
+        "section-taller": () => {
+          const section = editor.selected?.tagName === "SECTION" ? editor.selected : editor.selected?.closest?.("main > section");
+          if (!section) return;
+          const current = Number(state.edits[section.dataset.cmsId]?.styles?.minHeight)
+            || Math.round(section.getBoundingClientRect().height || 400);
+          editor.applySectionMinHeight?.(section, current + 80);
+          editor.selectElement(section);
+        },
+        "section-shorter": () => {
+          const section = editor.selected?.tagName === "SECTION" ? editor.selected : editor.selected?.closest?.("main > section");
+          if (!section) return;
+          const current = Number(state.edits[section.dataset.cmsId]?.styles?.minHeight)
+            || Math.round(section.getBoundingClientRect().height || 400);
+          editor.applySectionMinHeight?.(section, Math.max(120, current - 80));
+          editor.selectElement(section);
+        },
       };
       map[action]?.();
       syncFloat();
+    });
+    byId("admin-float-section-height")?.addEventListener("input", (event) => {
+      const section = editor.selected?.tagName === "SECTION" ? editor.selected : editor.selected?.closest?.("main > section");
+      if (!section) return;
+      editor.applySectionMinHeight?.(section, Number(event.currentTarget.value));
     });
 
     const bindFloatField = (id, apply) => {
@@ -272,17 +499,18 @@
       const image = editor.selected;
       if (!(image instanceof HTMLImageElement)) return;
       event.preventDefault();
+      editor.ensureImageCropFrame?.(image);
       const edit = state.edits[image.dataset.cmsId] ||= { styles: {} };
       const zoom = Math.max(100, Math.min(220, Number(edit.crop?.zoom || 100) + (event.deltaY < 0 ? 8 : -8)));
       edit.crop = {
-        fit: "cover",
+        fit: edit.crop?.fit || "cover",
         x: Number(edit.crop?.x ?? 50),
         y: Number(edit.crop?.y ?? 50),
         zoom,
       };
-      image.style.objectFit = "cover";
+      image.style.objectFit = edit.crop.fit;
       image.style.objectPosition = `${edit.crop.x}% ${edit.crop.y}%`;
-      image.style.transform = `scale(${zoom / 100})`;
+      image.style.transform = zoom === 100 ? "" : `scale(${zoom / 100})`;
       editor.saveDraft();
     }, { passive: false });
 
@@ -307,16 +535,18 @@
       byId(id).addEventListener("input", () => {
         const image = editor.selected;
         if (!(image instanceof HTMLImageElement)) return;
+        editor.ensureImageCropFrame?.(image);
         const edit = state.edits[image.dataset.cmsId] ||= { styles: {} };
+        const zoom = Math.max(100, Math.min(220, Number(byId("admin-crop-axis-zoom").value) || 100));
         edit.crop = {
-          fit: "cover",
+          fit: edit.crop?.fit || "cover",
           x: Number(byId("admin-crop-axis-x").value),
           y: Number(byId("admin-crop-axis-y").value),
-          zoom: Number(byId("admin-crop-axis-zoom").value),
+          zoom,
         };
-        image.style.objectFit = "cover";
+        image.style.objectFit = edit.crop.fit;
         image.style.objectPosition = `${edit.crop.x}% ${edit.crop.y}%`;
-        image.style.transform = `scale(${edit.crop.zoom / 100})`;
+        image.style.transform = zoom === 100 ? "" : `scale(${zoom / 100})`;
         editor.saveDraft();
       });
     });
@@ -357,39 +587,183 @@
         if (name === state.mediaLibrary.activeFolder) option.selected = true;
         return option;
       }));
+      const placeUploadOnPage = (item, clientX, clientY, { replaceSelected = false } = {}) => {
+        const isVideo = /\.(mp4|webm)$/i.test(item.url || "");
+        const dropTarget = clientX != null ? document.elementFromPoint(clientX, clientY) : null;
+        const dropOnSelectedMedia = replaceSelected
+          || (dropTarget && editor.selected && (dropTarget === editor.selected || editor.selected.contains?.(dropTarget)));
+        if (dropOnSelectedMedia && (editor.selected instanceof HTMLImageElement || editor.selected instanceof HTMLVideoElement)) {
+          const edit = state.edits[editor.selected.dataset.cmsId] ||= { styles: {} };
+          edit.media = item.url;
+          editor.selected.src = item.url;
+          if (editor.selected instanceof HTMLVideoElement) editor.selected.load();
+          editor.saveDraft();
+          editor.setStatus("Media replaced from uploads library.");
+          return;
+        }
+        const section = dropTarget?.closest?.("main > section")
+          || editor.resolvePlacementSection?.()
+          || document.getElementById(byId("admin-block-target")?.value || "")
+          || document.querySelector("main > section");
+        if (!section) {
+          editor.setStatus("Scroll to a page section before dropping media.", "error");
+          return;
+        }
+        editor.syncBlockTarget?.(section);
+        const block = {
+          id: `content-block-${crypto.randomUUID()}`,
+          type: isVideo ? "video" : "image",
+          sectionId: section.id || "work",
+          image: item.url,
+          src: item.url,
+          alt: (item.name || "Upload").replace(/\.[^.]+$/, ""),
+          text: "",
+        };
+        state.contentBlocks ||= [];
+        state.contentBlocks.push(block);
+        editor.addContentBlock?.(block);
+        editor.assignContentIds?.();
+        const placed = document.querySelector(`[data-cms-id="${CSS.escape(block.id)}-image"]`)
+          || document.querySelector(`[data-cms-id="${CSS.escape(block.id)}"]`);
+        if (placed && clientX != null && clientY != null) {
+          const sectionRect = section.getBoundingClientRect();
+          const edit = state.edits[placed.dataset.cmsId] ||= { styles: {} };
+          const offsetX = Math.round(clientX - sectionRect.left - 160);
+          const offsetY = Math.round(clientY - sectionRect.top - 110);
+          if (placed instanceof HTMLImageElement || placed instanceof HTMLVideoElement) {
+            edit.resize = { width: 320, height: 220, offsetX, offsetY };
+            editor.applyImageResize?.(placed, edit.resize);
+          } else {
+            edit.styles.left = offsetX;
+            edit.styles.top = offsetY;
+            editor.applyStyle?.(placed, edit.styles);
+          }
+          editor.selectElement?.(placed);
+        } else if (placed) {
+          editor.selectElement?.(placed);
+        }
+        editor.saveDraft();
+        editor.setStatus("Upload placed on the page. Drag to fine-tune position.");
+      };
+
+      const parseUploadPayload = (dataTransfer) => {
+        if (!dataTransfer) return null;
+        const raw = dataTransfer.getData("application/x-cms-upload")
+          || dataTransfer.getData("text/plain")
+          || "";
+        if (raw) {
+          try { return JSON.parse(raw); } catch (_) { /* fall through */ }
+        }
+        const uri = dataTransfer.getData("text/uri-list") || dataTransfer.getData("text/uri-list".toLowerCase()) || "";
+        if (uri && /^\/uploads\//.test(uri.split("\n")[0])) {
+          return { url: uri.split("\n")[0].trim(), name: uri.split("/").pop() };
+        }
+        return null;
+      };
+      const isUploadDrag = (dataTransfer) => {
+        if (window.__cmsUploadDragItem) return true;
+        const types = [...(dataTransfer?.types || [])].map(String);
+        return types.some((type) =>
+          type === "application/x-cms-upload"
+          || type === "text/plain"
+          || type === "text/uri-list");
+      };
+
       const items = state.mediaLibrary.folders[state.mediaLibrary.activeFolder] || [];
       grid.replaceChildren(...items.map((item) => {
-        const card = document.createElement("button");
-        card.type = "button";
+        const card = document.createElement("div");
         card.className = "admin-lib-card";
-        card.title = item.name || item.url;
+        card.draggable = true;
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.title = `${item.name || item.url} — drag onto the page or click to place`;
+        card.dataset.uploadUrl = item.url;
+        card.dataset.uploadName = item.name || "";
         if (/\.(mp4|webm)$/i.test(item.url)) card.textContent = "🎬 " + (item.name || "Video");
         else {
           const img = document.createElement("img");
           img.src = item.url;
           img.alt = item.name || "";
+          img.draggable = false;
           card.append(img);
         }
-        card.addEventListener("click", async () => {
-          if (editor.selected instanceof HTMLImageElement || editor.selected instanceof HTMLVideoElement) {
-            const edit = state.edits[editor.selected.dataset.cmsId] ||= { styles: {} };
-            edit.media = item.url;
-            editor.selected.src = item.url;
-            if (editor.selected instanceof HTMLVideoElement) editor.selected.load();
-            editor.saveDraft();
-            editor.setStatus("Media replaced from uploads library.");
-            return;
-          }
-          editor.addContentBlock?.({
-            id: `content-block-${crypto.randomUUID()}`,
-            type: /\.(mp4|webm)$/i.test(item.url) ? "video" : "image",
-            sectionId: byId("admin-block-target")?.value || "work",
-            src: item.url,
-            text: "",
-          });
+        let nativeDragStarted = false;
+        card.addEventListener("dragstart", (event) => {
+          nativeDragStarted = true;
+          window.__cmsUploadDragItem = item;
+          const payload = JSON.stringify(item);
+          event.dataTransfer.setData("application/x-cms-upload", payload);
+          event.dataTransfer.setData("text/plain", payload);
+          event.dataTransfer.setData("text/uri-list", item.url);
+          event.dataTransfer.effectAllowed = "copy";
+          card.classList.add("is-dragging");
+        });
+        card.addEventListener("dragend", () => {
+          nativeDragStarted = false;
+          window.__cmsUploadDragItem = null;
+          card.classList.remove("is-dragging");
+          document.body.classList.remove("cms-upload-drop-target");
+        });
+        // Pointer drag works even when HTML5 DnD from the sidebar is blocked
+        card.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) return;
+          nativeDragStarted = false;
+          const start = { x: event.clientX, y: event.clientY, moved: false };
+          const onMove = (moveEvent) => {
+            if (nativeDragStarted) return;
+            if (Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) < 8) return;
+            start.moved = true;
+            window.__cmsUploadDragItem = item;
+            document.body.classList.add("cms-upload-drop-target");
+            moveEvent.preventDefault();
+          };
+          const onUp = (upEvent) => {
+            document.removeEventListener("pointermove", onMove, true);
+            document.removeEventListener("pointerup", onUp, true);
+            document.body.classList.remove("cms-upload-drop-target");
+            if (nativeDragStarted) return;
+            const dragging = window.__cmsUploadDragItem;
+            window.__cmsUploadDragItem = null;
+            if (!start.moved) {
+              placeUploadOnPage(item);
+              return;
+            }
+            if (!dragging) return;
+            if (upEvent.target.closest?.(".admin-toolbar, .admin-properties, .admin-rail, .admin-float-toolbar")) return;
+            placeUploadOnPage(dragging, upEvent.clientX, upEvent.clientY);
+          };
+          document.addEventListener("pointermove", onMove, true);
+          document.addEventListener("pointerup", onUp, true);
         });
         return card;
       }));
+      if (!document.body.dataset.cmsUploadDropBound) {
+        document.body.dataset.cmsUploadDropBound = "true";
+        document.addEventListener("dragover", (event) => {
+          if (!isUploadDrag(event.dataTransfer)) return;
+          if (event.target.closest(".admin-toolbar, .admin-properties, .admin-rail, .admin-float-toolbar")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          document.body.classList.add("cms-upload-drop-target");
+        });
+        document.addEventListener("dragleave", (event) => {
+          if (event.relatedTarget && document.body.contains(event.relatedTarget)) return;
+          document.body.classList.remove("cms-upload-drop-target");
+        });
+        document.addEventListener("drop", (event) => {
+          document.body.classList.remove("cms-upload-drop-target");
+          const item = parseUploadPayload(event.dataTransfer) || window.__cmsUploadDragItem;
+          window.__cmsUploadDragItem = null;
+          if (!item) return;
+          if (event.target.closest(".admin-toolbar, .admin-properties, .admin-rail, .admin-float-toolbar")) return;
+          event.preventDefault();
+          try {
+            placeUploadOnPage(item, event.clientX, event.clientY);
+          } catch (_) {
+            editor.setStatus("Could not place that upload on the page.", "error");
+          }
+        });
+      }
     };
     byId("admin-lib-folder-select")?.addEventListener("change", (event) => {
       state.mediaLibrary.activeFolder = event.currentTarget.value;
@@ -455,14 +829,17 @@
       const kind = event.target.closest("[data-shape]")?.dataset.shape;
       if (!kind) return;
       state.shapes ||= [];
+      const section = editor.resolvePlacementSection?.()
+        || document.getElementById(byId("admin-block-target")?.value || "")
+        || document.querySelector("main > section");
       const shape = {
         id: `shape-${crypto.randomUUID()}`,
         kind: kind === "triangle" ? "rectangle" : kind,
-        sectionId: byId("admin-block-target")?.value || document.querySelector("main > section")?.id || "home",
+        sectionId: section?.id || "home",
         text: kind === "note" ? "Sticky note" : "",
       };
       state.shapes.push(shape);
-      const section = document.getElementById(shape.sectionId) || document.querySelector("main");
+      editor.syncBlockTarget?.(section);
       const element = document.createElement(kind === "note" ? "p" : "div");
       element.className = `cms-added-content-block cms-shape cms-shape-${kind}`;
       element.id = shape.id;
@@ -482,8 +859,11 @@
       const file = event.currentTarget.files?.[0];
       if (!file) return;
       const uploaded = await editor.uploadFile(file);
-      const sectionId = byId("admin-block-target")?.value || "work";
-      const section = document.getElementById(sectionId) || document.querySelector("main");
+      const section = editor.resolvePlacementSection?.()
+        || document.getElementById(byId("admin-block-target")?.value || "")
+        || document.querySelector("main > section");
+      const sectionId = section?.id || "work";
+      editor.syncBlockTarget?.(section);
       const wrap = document.createElement("figure");
       wrap.className = "cms-added-content-block cms-added-video";
       wrap.id = `content-block-${crypto.randomUUID()}`;
@@ -514,8 +894,8 @@
     bottomEdge.className = "admin-page-edge admin-page-edge-bottom";
     topEdge.dataset.cmsControl = "true";
     bottomEdge.dataset.cmsControl = "true";
-    topEdge.title = "Drag to resize page height";
-    bottomEdge.title = "Drag to resize page height";
+    topEdge.title = "Drag to extend page height";
+    bottomEdge.title = "Drag to extend page height";
     document.body.append(topEdge, bottomEdge);
     let pageResize = null;
     const applyPageHeight = (height) => {
@@ -525,8 +905,20 @@
       state.siteChrome.pageHeight = Math.max(600, height);
       editor.saveDraft();
     };
+    const syncPageEdgeNear = (clientY) => {
+      const nearTop = clientY <= 28;
+      const nearBottom = clientY >= window.innerHeight - 28;
+      topEdge.classList.toggle("is-near", nearTop && !pageResize);
+      bottomEdge.classList.toggle("is-near", nearBottom && !pageResize);
+    };
+    document.addEventListener("pointermove", (event) => {
+      if (pageResize) return;
+      syncPageEdgeNear(event.clientY);
+    });
     [topEdge, bottomEdge].forEach((edge) => {
       edge.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         const main = document.querySelector("main");
         if (!main) return;
         pageResize = {
@@ -534,6 +926,7 @@
           y: event.clientY,
           height: main.getBoundingClientRect().height,
         };
+        edge.classList.add("is-active");
         edge.setPointerCapture(event.pointerId);
       });
       edge.addEventListener("pointermove", (event) => {
@@ -541,7 +934,14 @@
         const delta = edge === bottomEdge ? event.clientY - pageResize.y : pageResize.y - event.clientY;
         applyPageHeight(pageResize.height + delta);
       });
-      edge.addEventListener("pointerup", () => { pageResize = null; });
+      edge.addEventListener("pointerup", () => {
+        edge.classList.remove("is-active");
+        pageResize = null;
+      });
+      edge.addEventListener("pointercancel", () => {
+        edge.classList.remove("is-active");
+        pageResize = null;
+      });
     });
     if (state.siteChrome.pageHeight) applyPageHeight(state.siteChrome.pageHeight);
 
@@ -556,6 +956,9 @@
       <button type="button" id="admin-paste-header">Paste header to all pages</button>
       <button type="button" id="admin-paste-footer">Paste footer to all pages</button>
       <small>Copied chrome is stored in your draft and applied on this page and case-study pages when published.</small>
+      <h3>Custom pages</h3>
+      <button type="button" class="admin-full admin-primary" id="admin-pages-add-page">＋ Add page</button>
+      <div id="admin-pages-custom-list"></div>
       <label>Open page
         <select id="admin-page-nav">
           <option value="/admin.html">Home (editor)</option>
@@ -566,6 +969,42 @@
       <button type="button" id="admin-open-page">Open page with toolbar</button>
     `;
     pagesPanel?.append(chromePanel);
+    const refreshPageNav = () => {
+      const select = byId("admin-page-nav");
+      const list = byId("admin-pages-custom-list");
+      if (!select) return;
+      [...select.querySelectorAll("option[data-custom-page]")].forEach((option) => option.remove());
+      (state.customPages || []).forEach((page) => {
+        const option = document.createElement("option");
+        option.value = `/pages/admin.html?page=${encodeURIComponent(page.slug)}`;
+        option.textContent = `${page.title || page.slug} (editor)`;
+        option.dataset.customPage = page.slug;
+        select.append(option);
+        const preview = document.createElement("option");
+        preview.value = `/pages/?page=${encodeURIComponent(page.slug)}`;
+        preview.textContent = `${page.title || page.slug} (preview)`;
+        preview.dataset.customPage = page.slug;
+        select.append(preview);
+      });
+      if (list) {
+        list.replaceChildren(...(state.customPages || []).map((page) => {
+          const row = document.createElement("div");
+          row.className = "admin-section-row";
+          row.innerHTML = `<span class="admin-section-title">${page.title || page.slug}</span>`;
+          const open = document.createElement("button");
+          open.type = "button";
+          open.textContent = "Open";
+          open.addEventListener("click", () => {
+            location.assign(`/pages/admin.html?page=${encodeURIComponent(page.slug)}`);
+          });
+          row.append(open);
+          return row;
+        }));
+      }
+    };
+    refreshPageNav();
+    byId("admin-pages-add-page")?.addEventListener("click", () => editor.addCustomPage?.());
+    document.addEventListener("cms-selection-changed", refreshPageNav);
     let chromeClipboard = { header: "", footer: "" };
     byId("admin-copy-header")?.addEventListener("click", () => {
       chromeClipboard.header = document.querySelector(".site-header")?.outerHTML || "";
@@ -605,7 +1044,7 @@
         }));
       } catch (_) { /* ignore */ }
       window.open(path, "_blank", "noopener,noreferrer");
-      editor.setStatus("Opened page. Re-open /admin.html anytime to restore the toolbar on the home editor.");
+      editor.setStatus("Opened page with editor tools. Use Exit preview or the CAPTAIN CAMPAIGN EDITOR badge to restore the toolbar anytime.");
     });
 
     /* ---------- Analytics + bookings ---------- */
@@ -707,8 +1146,12 @@
 
     // Keep toolbar mark available on other pages if admin scripts load
     document.querySelector(".admin-mark")?.addEventListener("click", () => {
-      document.body.classList.remove("cms-administrator-collapsed");
-      document.querySelector(".admin-toolbar")?.classList.remove("is-collapsed");
+      if (editor.toggleToolbar) editor.toggleToolbar(false);
+      else {
+        document.body.classList.remove("cms-administrator-collapsed");
+        document.querySelector(".admin-toolbar")?.classList.remove("is-collapsed");
+        document.getElementById("admin-restore-tools")?.setAttribute("hidden", "true");
+      }
     });
 
     editor.ready.then(async () => {

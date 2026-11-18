@@ -103,7 +103,7 @@
     const propsBody = document.getElementById("admin-properties-body");
     const propsTitle = document.getElementById("admin-properties-title");
     moveGroup("design", (group) => /Page appearance|Version history/i.test(group.querySelector("summary")?.textContent || ""));
-    moveGroup("pages", (group) => /Build your page|Page sections/i.test(group.querySelector("summary")?.textContent || ""));
+    moveGroup("pages", (group) => /Build your page|Page sections|Case study photos/i.test(group.querySelector("summary")?.textContent || ""));
     moveGroup("brand", (group) => group.dataset.adminPanel === "brand");
     moveGroup("layers", (group) => group.dataset.adminPanel === "layers");
     moveGroup("seo", (group) => group.dataset.adminPanel === "seo");
@@ -143,16 +143,44 @@
       document.getElementById("admin-add-text-block")?.click();
     });
 
+    const elementsQuick = document.createElement("div");
+    elementsQuick.className = "admin-elements-quick";
+    elementsQuick.innerHTML = `
+      <p class="admin-hint">Add portfolio projects and service cards, or remove them from Pages → Build your page.</p>
+      <button type="button" class="admin-full admin-primary" id="admin-quick-add-project">＋ Add portfolio project</button>
+      <button type="button" class="admin-full admin-primary" id="admin-quick-add-service">＋ Add service card</button>
+      <button type="button" class="admin-full admin-primary" id="admin-quick-add-page">＋ Add page</button>
+      <button type="button" class="admin-full admin-danger" id="admin-quick-delete">Delete selected</button>
+      <small class="admin-full">Use Remove under Build your page to delete a portfolio project or service card without hunting for it on the canvas.</small>
+    `;
+    panels.elements.prepend(elementsQuick);
+    elementsQuick.querySelector("#admin-quick-add-project")?.addEventListener("click", () => {
+      document.getElementById("admin-add-project")?.click();
+    });
+    elementsQuick.querySelector("#admin-quick-add-service")?.addEventListener("click", () => {
+      document.getElementById("admin-add-service")?.click();
+    });
+    elementsQuick.querySelector("#admin-quick-add-page")?.addEventListener("click", () => {
+      document.getElementById("admin-add-page")?.click();
+    });
+    elementsQuick.querySelector("#admin-quick-delete")?.addEventListener("click", () => {
+      document.getElementById("admin-delete")?.click();
+    });
+
     const uploadsQuick = document.createElement("div");
     uploadsQuick.className = "admin-uploads-quick";
     uploadsQuick.innerHTML = `
-      <p class="admin-hint">Replace selected media or add a photo block.</p>
+      <p class="admin-hint">Drag uploads onto the page, or replace selected media.</p>
       <button type="button" class="admin-full admin-primary" id="admin-quick-upload">Upload / replace media</button>
       <button type="button" class="admin-full" id="admin-quick-photo-block">＋ Photo block</button>
     `;
     panels.uploads.append(uploadsQuick);
     uploadsQuick.querySelector("#admin-quick-upload")?.addEventListener("click", () => {
-      document.getElementById("admin-replace-media")?.click();
+      const replace = document.getElementById("admin-replace-media");
+      if (replace && !replace.disabled && !replace.classList.contains("admin-relevant-hidden")) {
+        replace.click();
+        return;
+      }
       document.getElementById("admin-media-file")?.click();
     });
     uploadsQuick.querySelector("#admin-quick-photo-block")?.addEventListener("click", () => {
@@ -240,8 +268,16 @@
       const MoveableCtor = window.Moveable;
       const target = moveableTarget();
       if (!MoveableCtor || !target || document.body.classList.contains("cms-preview-mode")) return;
-      const snapOn = document.getElementById("admin-snap-enabled")?.checked !== false;
+      const snapOn = !document.body.classList.contains("cms-snap-hold-off")
+        && document.getElementById("admin-snap-enabled")?.checked !== false;
       const keepRatio = document.getElementById("admin-aspect-lock")?.checked !== false;
+      const elementGuidelines = [...document.querySelectorAll("[data-cms-id]")]
+        .filter((element) => element !== target
+          && !element.closest(".admin-toolbar, .admin-properties, .admin-rail, .moveable-control-box, #cms-smart-guides")
+          && element.getClientRects().length)
+        .slice(0, 24);
+      // Crop pans object-position only — do not attach Moveable resize/rotate handles.
+      if (document.body.classList.contains("cms-crop-mode")) return;
       moveable = new MoveableCtor(document.body, {
         target,
         container: document.body,
@@ -249,9 +285,13 @@
         resizable: true,
         rotatable: true,
         snappable: snapOn,
-        snapGap: true,
+        snapGap: false,
         snapThreshold: 6,
-        isDisplaySnapDigit: true,
+        isDisplaySnapDigit: false,
+        isDisplayInnerSnapDigit: false,
+        elementGuidelines,
+        horizontalGuidelines: [],
+        verticalGuidelines: [],
         keepRatio,
         origin: false,
         throttleResize: 0,
@@ -262,8 +302,16 @@
 
       moveable.on("resize", ({ target: el, width, height, drag }) => {
         window.CaptainCampaignEditor.moveableDragging = true;
-        el.style.width = `${width}px`;
-        el.style.height = `${height}px`;
+        let nextWidth = width;
+        let nextHeight = height;
+        const media = el.matches?.("img, video") ? el : el.querySelector?.("img[data-cms-id], video[data-cms-id]");
+        if (editor.snapResizeDimensions && media) {
+          const snapped = editor.snapResizeDimensions(width, height, [media]);
+          nextWidth = snapped.width;
+          nextHeight = snapped.height;
+        }
+        el.style.width = `${nextWidth}px`;
+        el.style.height = `${nextHeight}px`;
         if (drag) {
           el.style.position = "relative";
           el.style.left = `${Math.round(drag.left)}px`;
@@ -272,11 +320,19 @@
       });
       moveable.on("resizeEnd", ({ target: el }) => {
         window.CaptainCampaignEditor.moveableDragging = false;
+        let width = el.getBoundingClientRect().width;
+        let height = el.getBoundingClientRect().height;
+        const media = el.matches?.("img, video") ? el : el.querySelector?.("img[data-cms-id], video[data-cms-id]");
+        if (editor.snapResizeDimensions && media) {
+          const snapped = editor.snapResizeDimensions(width, height, [media]);
+          width = snapped.width;
+          height = snapped.height;
+        }
         persistTransform(el, {
           left: Number.parseFloat(el.style.left) || 0,
           top: Number.parseFloat(el.style.top) || 0,
-          width: el.getBoundingClientRect().width,
-          height: el.getBoundingClientRect().height,
+          width,
+          height,
         });
       });
       moveable.on("rotate", ({ target: el, rotate }) => {
@@ -381,9 +437,15 @@
     document.addEventListener("contextmenu", (event) => {
       if (!document.body.classList.contains("cms-administrator")) return;
       const target = event.target.closest("[data-cms-id]");
-      if (!target || target.closest(".admin-toolbar, .admin-properties, .admin-rail")) return;
+      if (!target || target.closest(".admin-toolbar, .admin-properties, .admin-rail, .admin-float-toolbar")) return;
       event.preventDefault();
       editor.selectElement(target);
+      // Prefer the floating Edit tools panel — avoid stacking a second menu on top of it.
+      hideContext();
+      if (typeof editor.openFloatToolbar === "function") {
+        editor.openFloatToolbar(event.clientX, event.clientY);
+        return;
+      }
       contextMenu.hidden = false;
       contextMenu.style.left = `${event.clientX}px`;
       contextMenu.style.top = `${event.clientY}px`;
@@ -414,6 +476,10 @@
         initMoveable();
       }, 0);
     });
+    document.addEventListener("cms-preview-changed", () => {
+      initMoveable();
+    });
+    document.getElementById("admin-snap-size")?.addEventListener("change", initMoveable);
 
     window.CaptainCampaignEditor = {
       useMoveable: false,

@@ -1,8 +1,101 @@
 (() => {
   const heroVideo = document.querySelector(".hero-video");
-  if (heroVideo && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    heroVideo.play().catch((error) => {
-      console.error("The background video could not start.", error);
+  if (heroVideo) {
+    const canAutoplay = () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ensureHeroPlaying = () => {
+      if (!canAutoplay()) return;
+      heroVideo.loop = true;
+      heroVideo.setAttribute("loop", "");
+      heroVideo.muted = true;
+      heroVideo.defaultMuted = true;
+      heroVideo.setAttribute("muted", "");
+      heroVideo.setAttribute("playsinline", "");
+      heroVideo.setAttribute("autoplay", "");
+      const play = () => {
+        const result = heroVideo.play();
+        if (result && typeof result.catch === "function") {
+          result.catch((error) => {
+            if (error?.name === "AbortError") return;
+            // Retry once after a short delay (covers interrupted loads).
+            window.setTimeout(() => {
+              heroVideo.play().catch((retryError) => {
+                if (retryError?.name !== "AbortError") {
+                  console.error("The background video could not start.", retryError);
+                }
+              });
+            }, 250);
+          });
+        }
+      };
+      if (heroVideo.error || heroVideo.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+        try { heroVideo.load(); } catch (_) { /* ignore */ }
+        heroVideo.addEventListener("loadeddata", play, { once: true });
+      }
+      play();
+    };
+    const restartHero = () => {
+      try {
+        heroVideo.currentTime = 0;
+        ensureHeroPlaying();
+      } catch (_) { /* ignore */ }
+    };
+    heroVideo.addEventListener("ended", restartHero);
+    // Resume if the loop stalls near the end; avoid fighting intentional load()/pause races.
+    heroVideo.addEventListener("pause", () => {
+      if (!canAutoplay() || document.hidden) return;
+      if (heroVideo.ended || heroVideo.currentTime >= (heroVideo.duration || 0) - 0.25) {
+        restartHero();
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) window.setTimeout(ensureHeroPlaying, 50);
+    });
+    if (heroVideo.readyState >= 2) ensureHeroPlaying();
+    else heroVideo.addEventListener("canplay", ensureHeroPlaying, { once: true });
+    window.setTimeout(ensureHeroPlaying, 600);
+  }
+
+  const PREVIEW_MODE_KEY = "liam-cms-preview-mode-v1";
+  /*
+   * SECURITY: Public visitors must never see editor chrome.
+   * A localStorage draft, a localhost or 127.0.0.1 hostname, a bare
+   * ?preview= query, and a pathname are not an administrator session.
+   * Inject #site-editor-chrome only when sessionStorage
+   * liam-cms-preview-mode-v1 parses to {active:true}. That bar may contain
+   * Exit preview only. Never inject it when body already has cms-administrator.
+   */
+  const shouldShowEditorChrome = () => {
+    if (document.body.classList.contains("cms-administrator")) return false;
+    try {
+      const preview = JSON.parse(sessionStorage.getItem(PREVIEW_MODE_KEY) || "null");
+      return Boolean(preview && preview.active === true);
+    } catch (_) { /* ignore malformed preview session */ }
+    return false;
+  };
+  const safeEditorPath = (value) => {
+    const path = String(value || "");
+    if (!/^\/(?!\/)(?:[A-Za-z0-9._~-]+\/)*admin\.html(?:\?[A-Za-z0-9._~%=&+-]*)?$/.test(path)) {
+      return "/admin.html";
+    }
+    return path;
+  };
+  if (shouldShowEditorChrome() && !document.getElementById("site-editor-chrome")) {
+    const chrome = document.createElement("div");
+    chrome.id = "site-editor-chrome";
+    chrome.className = "site-editor-chrome";
+    const returnTo = (() => {
+      try {
+        const preview = JSON.parse(sessionStorage.getItem(PREVIEW_MODE_KEY) || "null");
+        return safeEditorPath(preview?.returnTo);
+      } catch (_) {
+        return "/admin.html";
+      }
+    })();
+    chrome.innerHTML = `<button type="button" id="site-exit-preview">Exit preview</button>`;
+    document.body.append(chrome);
+    chrome.querySelector("#site-exit-preview")?.addEventListener("click", () => {
+      try { sessionStorage.removeItem(PREVIEW_MODE_KEY); } catch (_) { /* ignore */ }
+      window.location.href = returnTo;
     });
   }
 
@@ -30,23 +123,79 @@
   const dialogExample = document.querySelector("#dialog-example");
   const dialogImage = document.querySelector("#dialog-image");
 
+  const isCmsAdministrator = () => document.body.classList.contains("cms-administrator");
+  const isCmsEditing = () => isCmsAdministrator()
+    && !document.body.classList.contains("cms-preview-mode");
+
+  const closeServiceDialog = () => {
+    if (!serviceDialog) return;
+    try {
+      if (serviceDialog.open) serviceDialog.close();
+    } catch (_) {
+      serviceDialog.removeAttribute("open");
+    }
+    serviceDialog.classList.remove("cms-editor-dialog");
+  };
+
   if (serviceDialog) {
+    // Crash recovery: never boot the admin shell with a leftover modal backdrop.
+    if (isCmsAdministrator()) closeServiceDialog();
+
     document.querySelectorAll(".service-open").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
+        // In the CMS editor, admin.js opens Learn more via openServiceDialogForEdit.
+        // Still allow an explicit flag, and never block Preview/public opens.
+        if (isCmsEditing() && !event.__cmsOpenServiceDialog) {
+          return;
+        }
         dialogTitle.textContent = button.dataset.serviceTitle;
         dialogDescription.textContent = button.dataset.serviceDescription;
         dialogExample.textContent = button.dataset.serviceExample;
         dialogImage.src = button.dataset.serviceImage;
         dialogImage.alt = button.dataset.serviceAlt;
-        serviceDialog.showModal();
+        serviceDialog.dataset.sourceServiceId = button.closest(".service-card, .cms-added-service")?.id
+          || button.dataset.cmsId
+          || "";
+        if (dialogImage) {
+          dialogImage.dataset.sourceServiceSelector = serviceDialog.dataset.sourceServiceId;
+          dialogImage.dataset.cmsId = dialogImage.dataset.cmsId || "dialog-image";
+        }
+        const bookLink = serviceDialog.querySelector("[data-dialog-book]");
+        if (bookLink) {
+          bookLink.dataset.cmsId = bookLink.dataset.cmsId || "dialog-book-link";
+          if (button.dataset.serviceBookHref) bookLink.setAttribute("href", button.dataset.serviceBookHref);
+        }
+        // Public/preview: real centered modal. dialog.show() paints the panel in page flow at the footer.
+        serviceDialog.classList.remove("cms-editor-dialog");
+        const scrollY = window.scrollY;
+        if (typeof serviceDialog.showModal === "function") serviceDialog.showModal();
+        else serviceDialog.setAttribute("open", "");
+        window.requestAnimationFrame(() => window.scrollTo(0, scrollY));
+        document.dispatchEvent(new CustomEvent("cms-service-dialog-opened", {
+          detail: { button, dialog: serviceDialog, image: dialogImage },
+        }));
       });
     });
 
-    serviceDialog.querySelector(".dialog-close").addEventListener("click", () => serviceDialog.close());
-    serviceDialog.addEventListener("click", (event) => {
-      if (event.target === serviceDialog) serviceDialog.close();
+    serviceDialog.querySelector(".dialog-close").addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeServiceDialog();
     });
-    serviceDialog.querySelector("[data-dialog-book]").addEventListener("click", () => serviceDialog.close());
+    serviceDialog.addEventListener("click", (event) => {
+      // Backdrop / dialog chrome click always dismisses — never trap the CMS behind a black overlay.
+      if (event.target === serviceDialog) closeServiceDialog();
+    });
+    serviceDialog.querySelector("[data-dialog-book]").addEventListener("click", (event) => {
+      if (isCmsEditing()) {
+        event.preventDefault();
+        return;
+      }
+      closeServiceDialog();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && serviceDialog.open) closeServiceDialog();
+    });
   }
 
   const filterButtons = document.querySelectorAll(".filter-button");
@@ -58,10 +207,13 @@
   };
 
   portfolioGrid?.addEventListener("click", (event) => {
+    // CMS editor handles project opens itself (admin case-study route). Public navigates here.
+    if (isCmsEditing()) return;
     if (event.target.closest("a,button")) return;
     openProjectPage(event.target.closest(".project-card[role='link']"));
   });
   portfolioGrid?.addEventListener("keydown", (event) => {
+    if (isCmsEditing()) return;
     if (event.key !== "Enter") return;
     const card = event.target.closest(".project-card[role='link']");
     if (!card) return;

@@ -20,15 +20,21 @@
         "y": 43.18665720369056
       },
       "resize": {
-        "width": 313,
-        "height": 250,
+        "width": 400,
+        "height": 251,
         "offsetX": 0,
         "offsetY": 0
       }
     },
     "element-165-img": {
       "styles": {},
-      "media": "/uploads/f7f29a614133c34313992c1c73008f87.jpg"
+      "media": "/uploads/f7f29a614133c34313992c1c73008f87.jpg",
+      "resize": {
+        "width": 400,
+        "height": 251,
+        "offsetX": -1.00345,
+        "offsetY": 0
+      }
     },
     "element-175-img": {
       "styles": {},
@@ -44,8 +50,10 @@
       "styles": {},
       "media": "/uploads/14383f0c67a7ee7651f566a9396e274a.jpg",
       "resize": {
-        "width": 269,
-        "height": 218
+        "width": 344,
+        "height": 284,
+        "offsetX": 0,
+        "offsetY": 0
       }
     },
     "element-225-img": {
@@ -83,7 +91,11 @@
       "styles": {}
     },
     "element-233-article": {
-      "styles": {}
+      "styles": {
+        "left": 1,
+        "top": -36
+      },
+      "deleted": true
     },
     "element-257-img": {
       "styles": {},
@@ -116,14 +128,6 @@
       "styles": {},
       "media": "/uploads/616ff09dcfbfff7ef3e8d527356168f3.jpg"
     },
-    "element-328-button": {
-      "styles": {},
-      "text": ""
-    },
-    "element-331-button": {
-      "styles": {},
-      "text": ""
-    },
     "element-308-img": {
       "styles": {},
       "media": "/uploads/068a2b6b6dc944996f2fd4187b1c877f.jpg"
@@ -132,25 +136,9 @@
       "styles": {},
       "media": "/uploads/0045783bcda41c08f13d866155560d23.jpg"
     },
-    "element-330-button": {
-      "styles": {},
-      "text": ""
-    },
     "element-304-img": {
       "styles": {},
       "media": "/uploads/205301a2817c38b4742132519e0d273b.jpg"
-    },
-    "element-329-button": {
-      "styles": {},
-      "text": ""
-    },
-    "element-332-button": {
-      "styles": {},
-      "text": ""
-    },
-    "element-333-button": {
-      "styles": {},
-      "text": ""
     },
     "element-324-img": {
       "styles": {},
@@ -179,28 +167,285 @@
     "element-17-h1": {
       "styles": {
         "color": "#fcfdfc",
-        "left": 131,
-        "top": 159
+        "left": 0,
+        "top": 7
       },
       "text": "Make your brand\nthe moment people remember."
     },
-    "element-11-section": {
+    "element-21-a": {
       "styles": {
-        "left": 5,
+        "left": 218,
+        "top": 252
+      }
+    },
+    "element-34-h2": {
+      "styles": {}
+    },
+    "element-32-span": {
+      "styles": {}
+    },
+    "element-35-p": {
+      "styles": {}
+    },
+    "element-36-p": {
+      "styles": {}
+    },
+    "element-33-div": {
+      "styles": {}
+    },
+    "element-38-a": {
+      "styles": {}
+    },
+    "element-31-div": {
+      "styles": {
+        "left": 1,
+        "top": 0
+      }
+    },
+    "element-45-h2": {
+      "styles": {}
+    },
+    "element-46-p": {
+      "styles": {}
+    },
+    "element-347-div": {
+      "styles": {}
+    },
+    "element-181-p": {
+      "styles": {
+        "left": 0,
         "top": 1
       }
+    },
+    "element-173-article": {
+      "styles": {
+        "left": 9,
+        "top": 31
+      },
+      "text": "A branded mobile experience bringing Sargento's Cheese Wheeler to event stops, with a welcoming team and on-site guest engagement."
+    },
+    "element-180-h3": {
+      "styles": {
+        "left": 1,
+        "top": -1
+      }
+    },
+    "element-182-p": {
+      "styles": {
+        "left": 0,
+        "top": 69
+      }
+    },
+    "element-140-section": {
+      "styles": {
+        "left": -5,
+        "top": 0
+      }
+    },
+    "element-78-img": {
+      "styles": {},
+      "resize": {
+        "width": 353,
+        "height": 270,
+        "offsetX": -4,
+        "offsetY": 0
+      }
+    },
+    "element-77-button": {
+      "styles": {
+        "left": -13,
+        "top": -4
+      }
+    },
+    "element-82-span": {
+      "styles": {
+        "left": 0,
+        "top": -1
+      }
+    },
+    "element-88-span": {
+      "styles": {
+        "left": 4,
+        "top": 58
+      }
+    },
+    "element-84-button": {
+      "styles": {
+        "left": 11,
+        "top": 184
+      }
+    },
+    "element-15-div": {
+      "styles": {
+        "left": 0,
+        "top": 0
+      }
+    },
+    "element-29-div": {
+      "styles": {
+        "left": 0,
+        "top": 3
+      }
+    },
+    "element-40-section": {
+      "styles": {}
+    },
+    "element-30-section": {
+      "styles": {
+        "left": 0,
+        "top": 0
+      }
+    },
+    "content-block-d31f7a46-182c-42cf-bd73-491a231bf2a4-image": {
+      "styles": {},
+      "resize": {
+        "width": 320,
+        "height": 220,
+        "offsetX": 890,
+        "offsetY": 418
+      }
+    },
+    "content-block-b34e10a9-95ef-4c62-95b1-8acd01918dff-image": {
+      "styles": {},
+      "resize": {
+        "width": 320,
+        "height": 220,
+        "offsetX": -384,
+        "offsetY": 534
+      },
+      "deleted": true
+    },
+    "content-block-857a105d-6804-435b-b138-a50945a3615b-image": {
+      "styles": {},
+      "resize": {
+        "width": 320,
+        "height": 220,
+        "offsetX": 912,
+        "offsetY": 793
+      },
+      "deleted": true
+    },
+    "service-slot-4-image": {
+      "styles": {},
+      "resize": {
+        "width": 400.0000305175781,
+        "height": 303.0208435058594,
+        "offsetX": -2,
+        "offsetY": 0
+      },
+      "media": "/uploads/e231916701559175b7f38278f9f9b518.jpg"
+    },
+    "service-slot-5-image": {
+      "styles": {}
+    },
+    "service-slot-6-image": {
+      "styles": {},
+      "resize": {
+        "width": 400.0000305175781,
+        "height": 303.0208435058594,
+        "offsetX": 0,
+        "offsetY": -5
+      }
+    },
+    "project-nightmare-bar-image": {
+      "styles": {},
+      "resize": {
+        "width": 400.0000305175781,
+        "height": 322.5694580078125,
+        "offsetX": 1,
+        "offsetY": 0
+      },
+      "deleted": true,
+      "media": "/uploads/8a6888f1a1bd6f968e7d3bf41a136d8b.jpg"
+    },
+    "project-toyota-special-olympics-image": {
+      "styles": {}
+    },
+    "content-block-67a24fd5-4595-41e9-a0b7-75a6cacc3487-image": {
+      "styles": {},
+      "resize": {
+        "width": 1240,
+        "height": 698.4548950195312,
+        "offsetX": 1,
+        "offsetY": 0
+      },
+      "deleted": true
+    },
+    "work": {
+      "styles": {
+        "minHeight": 3928
+      }
+    },
+    "dialog-image": {
+      "styles": {},
+      "media": "/uploads/e231916701559175b7f38278f9f9b518.jpg",
+      "alt": "Super Troopers 3 promotional event at WWE SummerSlam",
+      "crop": {
+        "fit": "cover",
+        "x": 50.63051546034687,
+        "y": 3.125,
+        "zoom": 100
+      }
+    },
+    "service-slot-4-button": {
+      "styles": {},
+      "serviceImage": "/uploads/e231916701559175b7f38278f9f9b518.jpg"
     }
   },
   "sections": [],
   "sectionCopies": [],
   "sectionOrder": [],
   "projects": [],
+  "services": [],
   "contentBlocks": [],
+  "elementCopies": [],
   "buttons": [],
   "mediaElements": [],
+  "groups": [],
+  "customPages": [],
+  "caseStudyLayouts": {},
   "heroVideos": null,
   "theme": "original",
   "fontFamily": "inherit",
   "googleFont": "",
-  "fontFile": null
+  "fontFile": null,
+  "seo": {},
+  "analytics": {},
+  "brandKit": {
+    "colors": [
+      "#1A2B49",
+      "#FFB81C",
+      "#122038",
+      "#f4f2e9"
+    ],
+    "kits": [],
+    "activeKit": "Captain Campaign",
+    "sectionPresets": []
+  },
+  "mediaLibrary": {
+    "folders": {
+      "Inbox": [
+        {
+          "url": "/uploads/3bbd03849e7dc61fe781799da47d4d13.jpg",
+          "name": "P1002643.JPG",
+          "type": "image/jpeg",
+          "addedAt": 1794782462440
+        },
+        {
+          "url": "/uploads/4f7207f4fa1e0fdc60930cc17d946e44.jpg",
+          "name": "791042803_27772705019091393_5506386656246569035_n.jpg",
+          "type": "image/jpeg",
+          "addedAt": 1794965515059
+        }
+      ]
+    },
+    "activeFolder": "Inbox"
+  },
+  "siteChrome": {
+    "headerHtml": "",
+    "footerHtml": "",
+    "pageHeight": null
+  },
+  "bookings": [],
+  "shapes": []
 }

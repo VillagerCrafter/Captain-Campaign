@@ -68,8 +68,8 @@ layout: null
     <main id="main">
       <section class="hero" id="home" aria-labelledby="hero-title">
         <div class="hero-media" aria-hidden="true">
-          <video class="hero-video" muted loop playsinline poster="{{ '/assets/images/nightmare-host.jpg' | relative_url }}">
-            <source src="{{ '/assets/videos/gx010514-loop.mp4' | relative_url }}" type="video/mp4">
+          <video class="hero-video" muted loop playsinline autoplay preload="auto" poster="{{ '/assets/images/nightmare-host.jpg' | relative_url }}">
+            <source src="{{ '/assets/videos/hero-loop.mp4' | relative_url }}" type="video/mp4">
           </video>
         </div>
         <div class="hero-shade" aria-hidden="true"></div>
@@ -165,6 +165,7 @@ layout: null
           <article class="service-card">
             <button class="service-open" type="button"
               data-service-title="{{ service.title | escape }}"
+              data-service-summary="{{ service.summary | escape }}"
               data-service-description="{{ service.description | escape }}"
               data-service-example="{{ service.example | escape }}"
               data-service-image="{{ service.image | relative_url }}"

@@ -1,10 +1,23 @@
 (() => {
   const contentScript = document.querySelector('script[data-content-url]');
   const contentUrl = contentScript?.dataset.contentUrl;
-  const siteBaseUrl = contentScript?.dataset.siteBaseurl || "";
-  const resolveSitePath = (path) => typeof path === "string" && path.startsWith("/")
-    ? `${siteBaseUrl}${path}`
-    : path;
+  const configuredBase = contentScript?.dataset.siteBaseurl || "";
+  // Local preview serves from "/" even when GitHub Pages uses /Captain-Campaign.
+  const siteBaseUrl = (() => {
+    if (!configuredBase || configuredBase === "/") return "";
+    const host = location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") return "";
+    if (location.pathname.startsWith(configuredBase + "/") || location.pathname === configuredBase) {
+      return configuredBase;
+    }
+    return "";
+  })();
+  const resolveSitePath = (path) => {
+    if (typeof path !== "string" || !path.startsWith("/")) return path;
+    if (!siteBaseUrl) return path;
+    if (path === siteBaseUrl || path.startsWith(`${siteBaseUrl}/`)) return path;
+    return `${siteBaseUrl}${path}`;
+  };
   const textSelector = [
     "h1", "h2", "h3", "h4", "p", ".brand-name", ".brand-band-heading",
     ".hero-note", ".section-number", ".story-kicker", ".step-number",
@@ -16,13 +29,57 @@
     ".intro-actions > a", "a", "button:not(.service-open)",
   ].join(",");
   const getCandidates = (root = document) => [
-    ...root.querySelectorAll(`${textSelector}, img, video, section, article, div, form, nav, footer, header, iframe, .service-open, button`),
-  ].filter((element) => !element.closest(".admin-toolbar, .service-dialog, .admin-mark"));
+    ...root.querySelectorAll(`${textSelector}, img, video, section, article, div, form, nav, footer, header, iframe, .service-open, button, #dialog-image, [data-dialog-book]`),
+  ].filter((element) => {
+    if (element.closest(".admin-toolbar, .admin-mark")) return false;
+    const dialog = element.closest(".service-dialog");
+    if (!dialog) return true;
+    return element.id === "dialog-image" || element.matches?.("[data-dialog-book]");
+  });
+
+  const stableContentId = (element) => {
+    if (element.id && /^(project-|service-|shape-|content-block-|element-copy-|custom-cta-|stock-image-)/.test(element.id)) {
+      return element.id;
+    }
+    const projectCard = element.closest?.(".project-card[id^='project-']");
+    if (projectCard) {
+      if (element === projectCard) return projectCard.id;
+      // Unique ids only — shared ids made baseline restore wipe wraps to "01" and delete photos.
+      if (element.matches?.("img") && element.closest?.(".project-image-wrap")) return `${projectCard.id}-image`;
+      if (element.matches?.(".project-image-wrap")) return `${projectCard.id}-image-wrap`;
+      if (element.matches?.(".project-index")) return `${projectCard.id}-index`;
+      if (element.matches?.("h3")) return `${projectCard.id}-title`;
+      if (element.matches?.(".project-description")) return `${projectCard.id}-description`;
+      if (element.matches?.(".project-role")) return `${projectCard.id}-role`;
+      if (element.matches?.(".project-meta")) return `${projectCard.id}-meta`;
+    }
+    const serviceCard = element.closest?.(".service-card, .cms-added-service");
+    if (serviceCard) {
+      const base = serviceCard.id || (() => {
+        const grid = serviceCard.parentElement;
+        const idx = grid ? [...grid.children].indexOf(serviceCard) : -1;
+        return idx >= 0 ? `service-slot-${idx + 1}` : null;
+      })();
+      if (!base) return null;
+      if (element === serviceCard) return base;
+      if (element.matches?.("img") && serviceCard.contains(element)) return `${base}-image`;
+      if (element.matches?.(".service-image-wrap")) return `${base}-image-wrap`;
+      if (element.matches?.(".service-open") && serviceCard.contains(element)) return `${base}-button`;
+      if (element.matches?.(".service-number")) return `${base}-number`;
+      if (element.matches?.(".service-title")) return `${base}-title`;
+      if (element.matches?.(".service-summary")) return `${base}-summary`;
+    }
+    if (element.id && /^[\w-]+$/.test(element.id)) return element.id;
+    return null;
+  };
 
   const assignContentIds = () => {
     getCandidates().forEach((element, index) => {
       if (!element.dataset.cmsId) {
-        element.dataset.cmsId = `element-${index}-${element.tagName.toLowerCase()}`;
+        element.dataset.cmsId = stableContentId(element) || `element-${index}-${element.tagName.toLowerCase()}`;
+      }
+      if (element instanceof HTMLImageElement && element.getAttribute("src") && !element.dataset.cmsFallback) {
+        element.dataset.cmsFallback = element.getAttribute("src");
       }
     });
   };
@@ -99,42 +156,103 @@
     parent.append(caption);
   };
 
-  /* Mark images whose source fails to load so the frame shows a replace hint. */
+  /* Recover broken images instead of permanently hiding them. */
   const watchBrokenImages = () => {
     document.querySelectorAll("img").forEach((image) => {
       if (image.dataset.cmsBrokenWatched) return;
       image.dataset.cmsBrokenWatched = "true";
-      const mark = () => image.classList.toggle("cms-image-missing", !image.currentSrc && !image.src || image.complete && image.naturalWidth === 0);
-      image.addEventListener("error", mark);
-      if (image.complete) mark();
-      else image.addEventListener("load", mark, { once: true });
+      const originalSrc = baseline.get(image.dataset.cmsId)?.src
+        || image.getAttribute("data-cms-fallback")
+        || "";
+      if (originalSrc) image.setAttribute("data-cms-fallback", originalSrc);
+      const recover = () => {
+        const broken = (!image.getAttribute("src") && !image.currentSrc)
+          || (image.complete && image.naturalWidth === 0);
+        if (!broken) {
+          image.classList.remove("cms-image-missing");
+          return;
+        }
+        const fallback = image.getAttribute("data-cms-fallback") || originalSrc;
+        const current = image.getAttribute("src") || "";
+        if (fallback && current !== fallback && resolveSitePath(fallback) !== current) {
+          image.classList.remove("cms-image-missing");
+          image.src = resolveSitePath(fallback);
+          return;
+        }
+        // Keep frame visible; do not display:none away the only photo slot.
+        image.classList.remove("cms-image-missing");
+      };
+      image.addEventListener("error", recover);
+      image.addEventListener("load", () => image.classList.remove("cms-image-missing"));
+      if (image.complete) recover();
     });
   };
 
   const applyHeroVideos = (settings) => {
     if (!heroVideo) return;
     window.clearInterval(heroVideoTimer);
+    heroVideo.loop = true;
+    heroVideo.setAttribute("loop", "");
+    heroVideo.setAttribute("playsinline", "");
+    heroVideo.muted = true;
+    const restart = () => {
+      try {
+        heroVideo.currentTime = 0;
+        heroVideo.play().catch(() => {});
+      } catch (_) { /* ignore */ }
+    };
+    if (!heroVideo.dataset.cmsLoopBound) {
+      heroVideo.dataset.cmsLoopBound = "true";
+      heroVideo.addEventListener("ended", restart);
+      heroVideo.addEventListener("pause", () => {
+        if (heroVideo.ended || heroVideo.currentTime >= (heroVideo.duration || 0) - 0.15) restart();
+      });
+    }
     const items = Array.isArray(settings?.items)
-      ? settings.items.filter((item) => typeof item === "string" && /^\/uploads\/[\w.-]+$/.test(item)).slice(0, 12)
+      ? settings.items.filter((item) => typeof item === "string" && /^\/(?:uploads\/[\w.-]+|assets\/videos\/[\w./-]+)$/.test(item)).slice(0, 12)
       : [];
     if (!items.length) {
-      const current = heroVideo.getAttribute("src");
-      if (current) {
-        heroVideo.removeAttribute("src");
-        const source = heroVideo.querySelector("source");
-        if (source && originalHeroVideo) source.src = originalHeroVideo;
-        heroVideo.load();
-        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Default HTML uses <source> only (no video[src]). Keep the file playing without
+      // calling load() unless the source actually changed (load() aborts in-flight play).
+      const source = heroVideo.querySelector("source");
+      const fallback = originalHeroVideo
+        || source?.getAttribute("src")
+        || "/assets/videos/hero-loop.mp4";
+      const fallbackPath = resolveSitePath(fallback);
+      const currentPath = heroVideo.currentSrc || source?.src || "";
+      const needsSwap = !currentPath
+        || (!currentPath.includes("hero-loop.mp4") && !currentPath.includes("gx010514-loop.mp4") && fallbackPath && !currentPath.endsWith(fallbackPath.split("/").pop()));
+      if (heroVideo.getAttribute("src")) heroVideo.removeAttribute("src");
+      if (needsSwap) {
+        if (source) source.src = fallbackPath.startsWith("http") ? fallback : fallbackPath;
+        else {
+          const next = document.createElement("source");
+          next.src = fallback;
+          next.type = "video/mp4";
+          heroVideo.append(next);
+        }
+        try { heroVideo.load(); } catch (_) { /* ignore */ }
+      }
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const kick = () => {
+          heroVideo.muted = true;
+          heroVideo.defaultMuted = true;
+          heroVideo.loop = true;
+          if (!heroVideo.paused && heroVideo.readyState >= 2) return;
           heroVideo.play().catch((error) => {
             if (error.name !== "AbortError") console.error("Could not resume the original hero video.", error);
           });
-        }
+        };
+        if (heroVideo.readyState >= 2) kick();
+        else heroVideo.addEventListener("canplay", kick, { once: true });
+        window.setTimeout(kick, 500);
       }
       return;
     }
     let index = 0;
     const playCurrent = () => {
       heroVideo.src = resolveSitePath(items[index % items.length]);
+      heroVideo.loop = items.length === 1;
       heroVideo.load();
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         heroVideo.play().catch((error) => {
@@ -154,6 +272,7 @@
     const allowed = {
       width: (value) => `${Math.max(40, Math.min(2400, Number(value)))}px`,
       height: (value) => `${Math.max(30, Math.min(1800, Number(value)))}px`,
+      minHeight: (value) => `${Math.max(120, Math.min(4000, Number(value)))}px`,
       fontSize: (value) => `${Math.max(8, Math.min(300, Number(value)))}px`,
       left: (value) => `${Math.max(-4000, Math.min(4000, Number(value)))}px`,
       top: (value) => `${Math.max(-4000, Math.min(4000, Number(value)))}px`,
@@ -176,34 +295,103 @@
       fontFamily: (value) => ["inherit", "Georgia, serif", "Arial, sans-serif", "custom"].includes(value) ? value : null,
     };
 
-    if (styles.rotate !== undefined) {
+    // Story cards, the stakes note, and headings inside .story-section stay in
+    // normal flow. Free-drag left/top was stacking that copy on top of itself.
+    const lockFlowLayout = Boolean(
+      element.matches?.(".hero-shade, .hero-media, .hero-video, .hero")
+      || element.closest?.(".story-section, .hero-shade, .hero-media"),
+    );
+    if (!lockFlowLayout && styles.rotate !== undefined) {
       element.style.transform = `rotate(${Math.max(-180, Math.min(180, Number(styles.rotate)))}deg)`;
     }
-    if (styles.left !== undefined || styles.top !== undefined) element.dataset.cmsKeepOffset = "true";
-    if (styles.borderWidth !== undefined && Number(styles.borderWidth) > 0) element.style.borderStyle = "solid";
+    const nextStyles = lockFlowLayout
+      ? Object.fromEntries(Object.entries(styles).filter(([name]) => name !== "left" && name !== "top"))
+      : styles;
+    if (nextStyles.left !== undefined || nextStyles.top !== undefined) element.dataset.cmsKeepOffset = "true";
+    if (nextStyles.borderWidth !== undefined && Number(nextStyles.borderWidth) > 0) element.style.borderStyle = "solid";
 
-    Object.entries(styles).forEach(([name, value]) => {
+    Object.entries(nextStyles).forEach(([name, value]) => {
       if (!Object.hasOwn(allowed, name)) return;
+      if (lockFlowLayout && (name === "left" || name === "top")) return;
       const cssValue = allowed[name](value);
       if (cssValue) {
         element.style[name] = name === "fontFamily" && value === "custom" ? "LiamImportedFont, sans-serif" : cssValue;
-        if ((name === "zIndex" || name === "left" || name === "top") && getComputedStyle(element).position === "static") element.style.position = "relative";
+        if (!lockFlowLayout && (name === "zIndex" || name === "left" || name === "top") && getComputedStyle(element).position === "static") element.style.position = "relative";
       }
     });
+    if (lockFlowLayout) {
+      element.style.removeProperty("left");
+      element.style.removeProperty("top");
+      element.style.removeProperty("inset");
+      element.style.removeProperty("position");
+      element.style.removeProperty("transform");
+      delete element.dataset.cmsKeepOffset;
+    }
   };
 
   const imageFrameFor = (media) => {
     if (media instanceof HTMLVideoElement) return media.closest(".hero") || media;
     return media?.closest(
-      ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
+      ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image, .cms-added-image, .cms-stock-image",
     ) || media;
   };
+  const isBuiltInImageFrame = (frame) => frame?.matches?.(
+    ".project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
+  );
+  const isUploadedImageFrame = (frame) => frame?.matches?.(".cms-added-image, .cms-stock-image");
   const applyImageResize = (media, dimensions) => {
     if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement) || !dimensions) return;
     const width = Math.max(40, Math.min(2400, Number(dimensions.width) || 0));
     const height = Math.max(30, Math.min(1800, Number(dimensions.height) || 0));
     if (!width || !height) return;
     const frame = imageFrameFor(media);
+    // Card frames must stay in layout — freefloat offsets were hiding portfolio photos.
+    if (isBuiltInImageFrame(frame)) {
+      frame.style.width = "";
+      frame.style.height = "";
+      frame.style.aspectRatio = "";
+      frame.style.maxWidth = "";
+      frame.style.left = "";
+      frame.style.top = "";
+      frame.style.position = "";
+      media.style.width = "100%";
+      media.style.height = "100%";
+      media.style.maxWidth = "none";
+      media.style.objectFit = media.style.objectFit || "cover";
+      return;
+    }
+    // Uploaded images: lock the figure box; never stretch the img to 100% of the section.
+    if (isUploadedImageFrame(frame) || frame === media) {
+      const box = isUploadedImageFrame(frame) ? frame : media;
+      box.style.width = `${width}px`;
+      box.style.height = `${height}px`;
+      box.style.aspectRatio = "";
+      box.style.maxWidth = "100%";
+      box.style.overflow = "hidden";
+      box.style.position = box.style.position || "relative";
+      if (Number.isFinite(Number(dimensions.offsetX)) || Number.isFinite(Number(dimensions.offsetY))) {
+        const offsetX = Number.isFinite(Number(dimensions.offsetX))
+          ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetX)))
+          : 0;
+        const offsetY = Number.isFinite(Number(dimensions.offsetY))
+          ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetY)))
+          : 0;
+        box.style.left = `${offsetX}px`;
+        box.style.top = `${offsetY}px`;
+        if (offsetX || offsetY) {
+          box.style.position = "relative";
+          box.dataset.cmsKeepOffset = "true";
+          media.dataset.cmsKeepOffset = "true";
+        }
+      }
+      if (media !== box) {
+        media.style.width = "100%";
+        media.style.height = "100%";
+        media.style.maxWidth = "none";
+      }
+      media.style.objectFit = media.style.objectFit || "cover";
+      return;
+    }
     frame.style.width = `${width}px`;
     frame.style.height = "auto";
     frame.style.aspectRatio = `${width} / ${height}`;
@@ -334,6 +522,43 @@
     });
   };
 
+  const renderService = (service) => {
+    const grid = document.querySelector(".services-grid");
+    if (!grid || !service?.id || document.getElementById(`service-${service.id}`)) return;
+    if (!/^custom-[\w-]+$/.test(service.id) || !/^\/(?:uploads\/[\w.-]+|assets\/images\/[\w./-]+)$/.test(service.image || "")) return;
+    const article = document.createElement("article");
+    article.className = "service-card cms-published-addition";
+    article.id = `service-${service.id}`;
+    article.dataset.serviceId = service.id;
+    article.dataset.cmsId = `service-${service.id}`;
+    article.innerHTML = `
+      <button class="service-open" type="button"
+        data-service-title=""
+        data-service-summary=""
+        data-service-description=""
+        data-service-example=""
+        data-service-image=""
+        data-service-alt=""
+        aria-label="">
+        <span class="service-image-wrap"><img loading="lazy" width="900" height="650"><span class="service-image-action" aria-hidden="true">Explore service <span>↗</span></span></span>
+        <span class="service-card-copy"><span class="service-number"></span><span class="service-title"></span><span class="service-summary"></span></span>
+      </button>`;
+    const button = article.querySelector(".service-open");
+    button.dataset.serviceTitle = service.title || "";
+    button.dataset.serviceSummary = service.summary || "";
+    button.dataset.serviceDescription = service.description || "";
+    button.dataset.serviceExample = service.example || "";
+    button.dataset.serviceImage = resolveSitePath(service.image);
+    button.dataset.serviceAlt = service.alt || service.title || "";
+    button.setAttribute("aria-label", `Learn more about ${service.title || "service"}`);
+    article.querySelector("img").src = resolveSitePath(service.image);
+    article.querySelector("img").alt = service.alt || service.title || "";
+    article.querySelector(".service-number").textContent = String(grid.children.length + 1).padStart(2, "0");
+    article.querySelector(".service-title").textContent = service.title || "";
+    article.querySelector(".service-summary").textContent = service.summary || "";
+    grid.append(article);
+  };
+
   const renderProject = (project) => {
     const grid = document.querySelector(".portfolio-grid");
     if (!grid || !project?.id || !project.title || !project.image) return;
@@ -389,17 +614,73 @@
     main.append(element);
   };
 
-  const applyContent = (content) => {
-    if (!content || typeof content !== "object") return;
+  const injectCustomPageNav = (rootContent) => {
+    const nav = document.querySelector(".primary-navigation");
+    if (!nav) return;
+    nav.querySelectorAll("a[data-cms-custom-page]").forEach((link) => link.remove());
+    (rootContent.customPages || []).forEach((page) => {
+      if (!page || page.showInNav === false || typeof page.slug !== "string" || !page.slug.trim()) return;
+      const link = document.createElement("a");
+      link.href = resolveSitePath(`/pages/?page=${encodeURIComponent(page.slug)}`);
+      link.textContent = String(page.navLabel || page.title || page.slug).slice(0, 80);
+      link.dataset.cmsCustomPage = page.slug;
+      const cta = nav.querySelector(".nav-cta");
+      if (cta) nav.insertBefore(link, cta);
+      else nav.append(link);
+    });
+  };
+
+  const applyContent = (rawContent) => {
+    if (!rawContent || typeof rawContent !== "object") return;
+    const pageSlug = (new URLSearchParams(location.search).get("page") || document.body.dataset.pageSlug || "").trim();
+    const customPage = pageSlug && Array.isArray(rawContent.customPages)
+      ? rawContent.customPages.find((page) => page && page.slug === pageSlug)
+      : null;
+    if (customPage) {
+      document.querySelector("main")?.replaceChildren();
+      const pageTitle = String(customPage.title || customPage.slug).slice(0, 160);
+      document.title = `${pageTitle} | Captain Campaign`;
+    } else if (pageSlug && /\/pages\//.test(location.pathname)) {
+      document.querySelector("main")?.replaceChildren();
+      const missing = document.createElement("section");
+      missing.className = "section-pad";
+      missing.innerHTML = `<div class="page-width"><h1>Page not found</h1><p>This custom page is not published yet.</p><p><a href="${resolveSitePath("/")}">Back home</a></p></div>`;
+      document.querySelector("main")?.append(missing);
+      injectCustomPageNav(rawContent);
+      appliedContent = rawContent;
+      return;
+    }
+    const content = customPage ? {
+      ...rawContent,
+      edits: customPage.edits || {},
+      sections: customPage.sections || [],
+      sectionOrder: customPage.sectionOrder || [],
+      sectionCopies: customPage.sectionCopies || [],
+      contentBlocks: customPage.contentBlocks || [],
+      elementCopies: customPage.elementCopies || [],
+      projects: customPage.projects || [],
+      services: customPage.services || [],
+      buttons: customPage.buttons || [],
+      mediaElements: customPage.mediaElements || [],
+      shapes: customPage.shapes || [],
+      groups: customPage.groups || [],
+      heroVideos: null,
+    } : rawContent;
     appliedContent = content;
 
     baseline.forEach((original, id) => {
+      if (customPage) return;
       const element = getContentElement(id);
       if (!element) return;
-      if (original.html !== null) element.innerHTML = original.html;
+      // Only restore HTML on leaf text nodes — never on wraps/cards (that wiped portfolio <img> tags).
+      if (original.html !== null && element.matches(textSelector) && !element.querySelector("img, video, .project-image-wrap, .service-image-wrap")) {
+        element.innerHTML = original.html;
+      }
       const previousSrc = element.getAttribute("src");
       for (const [attribute, value] of [["src", original.src], ["alt", original.alt], ["href", original.href], ["style", original.style]]) {
+        if (!(attribute in element) && attribute !== "style") continue;
         if (element instanceof HTMLVideoElement && attribute === "src" && content.heroVideos?.items?.length) continue;
+        if (attribute === "src" && !(element instanceof HTMLImageElement || element instanceof HTMLVideoElement || element instanceof HTMLIFrameElement)) continue;
         if (value === null) element.removeAttribute(attribute);
         else element.setAttribute(attribute, value);
       }
@@ -423,18 +704,20 @@
       ...(content.sections || []).map((section) => section.id),
       ...(content.sectionCopies || []).map((section) => section.id),
       ...(content.projects || []).map((project) => `project-${project.id}`),
+      ...(content.services || []).map((service) => `service-${service.id}`),
       ...(content.contentBlocks || []).map((block) => block.id),
       ...(content.elementCopies || []).map((copy) => copy.id),
       ...(content.buttons || []).map((item) => item.id),
       ...(content.mediaElements || []).map((item) => item.id),
     ]);
     document.querySelectorAll(".cms-published-addition").forEach((element) => {
-      if (!additionIds.has(element.dataset.cmsId)) element.remove();
+      if (!additionIds.has(element.dataset.cmsId) && !additionIds.has(element.id)) element.remove();
     });
     document.querySelectorAll(".cms-stock-credit").forEach((caption) => caption.remove());
-    originalSections.forEach((section) => document.querySelector("main")?.append(section));
+    if (!customPage) originalSections.forEach((section) => document.querySelector("main")?.append(section));
     (content.sections || []).forEach(renderSection);
     (content.projects || []).forEach(renderProject);
+    (content.services || []).forEach(renderService);
     (content.contentBlocks || []).forEach(renderContentBlock);
     (content.mediaElements || []).forEach((item) => {
       if (!item || !/^stock-image-[\w-]+$/.test(item.id || "") ||
@@ -460,6 +743,14 @@
     renderElementCopies(content.elementCopies);
     assignContentIds();
 
+    // Keep card label fallbacks before edits so empty text payloads can be repaired.
+    document.querySelectorAll(".service-open").forEach((button) => {
+      const title = button.querySelector(".service-title")?.textContent?.trim() || "";
+      const summary = button.querySelector(".service-summary")?.textContent?.trim() || "";
+      if (title) button.dataset.serviceTitle = button.dataset.serviceTitle || title;
+      if (summary) button.dataset.serviceSummary = button.dataset.serviceSummary || summary;
+    });
+
     Object.entries(content.edits || {}).forEach(([id, edit]) => {
       const element = getContentElement(id);
       if (!element) return;
@@ -468,12 +759,29 @@
         return;
       }
       if (typeof edit.text === "string" && element.matches(textSelector)) {
-        element.textContent = edit.text;
-        element.style.whiteSpace = "pre-line";
+        const isServiceCopy = element.matches?.(".service-title, .service-summary, .service-number");
+        if (!(isServiceCopy && !edit.text.trim())) {
+          element.textContent = edit.text;
+          element.style.whiteSpace = "pre-line";
+        }
       }
       if (element.matches(".service-open")) {
         if (typeof edit.serviceDescription === "string") element.dataset.serviceDescription = edit.serviceDescription;
         if (typeof edit.serviceExample === "string") element.dataset.serviceExample = edit.serviceExample;
+        if (typeof edit.serviceSummary === "string" && edit.serviceSummary.trim()) {
+          element.dataset.serviceSummary = edit.serviceSummary;
+        }
+        if (typeof edit.serviceBookHref === "string" && /^(https?:|mailto:|\/|#)/i.test(edit.serviceBookHref)) {
+          element.dataset.serviceBookHref = edit.serviceBookHref;
+        }
+        if (typeof edit.serviceImage === "string" && /^\/(?:uploads\/[\w.-]+|assets\/(?:images|videos)\/[\w./-]+)$/.test(edit.serviceImage)) {
+          element.dataset.serviceImage = edit.serviceImage;
+          const img = element.querySelector("img");
+          if (img) img.src = resolveSitePath(edit.serviceImage);
+        }
+      }
+      if (typeof edit.sectionMargin === "number" && edit.sectionMargin > 0 && element.tagName === "SECTION") {
+        element.style.setProperty("padding-inline", `${Math.max(0, Math.min(160, edit.sectionMargin))}px`);
       }
       if (typeof edit.alt === "string" && element instanceof HTMLImageElement) element.alt = edit.alt;
       if (edit.crop && element instanceof HTMLImageElement) {
@@ -496,14 +804,30 @@
       if (typeof edit.src === "string" && element instanceof HTMLIFrameElement && /^(https:\/\/|\/(?!\/))/i.test(edit.src)) {
         element.src = resolveSitePath(edit.src);
       }
-      if (typeof edit.media === "string" && /^\/uploads\/[\w.-]+$/.test(edit.media)) {
+      if (typeof edit.media === "string" && /^\/(?:uploads\/[\w.-]+|assets\/(?:images|videos)\/[\w./-]+)$/.test(edit.media)) {
         if (element instanceof HTMLImageElement) {
-          element.src = resolveSitePath(edit.media);
+          const nextSrc = resolveSitePath(edit.media);
+          const fallback = baseline.get(id)?.src
+            || element.getAttribute("data-cms-fallback")
+            || element.getAttribute("src")
+            || "";
+          if (fallback) element.setAttribute("data-cms-fallback", fallback);
+          element.classList.remove("cms-image-missing");
+          const onFail = () => {
+            const back = element.getAttribute("data-cms-fallback") || fallback;
+            if (back && element.getAttribute("src") !== resolveSitePath(back)) {
+              element.src = resolveSitePath(back);
+            }
+            element.classList.remove("cms-image-missing");
+          };
+          element.addEventListener("error", onFail, { once: true });
+          element.src = nextSrc;
           const serviceButton = element.closest(".service-open");
           if (serviceButton) serviceButton.dataset.serviceImage = edit.media;
         }
         if (element instanceof HTMLVideoElement) {
           element.src = resolveSitePath(edit.media);
+          element.loop = true;
           element.load();
           element.play().catch((error) => console.error("The edited background video could not start.", error));
         }
@@ -533,6 +857,17 @@
         }
       }
       if (edit.credit && element instanceof HTMLImageElement) renderCredit(element, edit.credit);
+    });
+
+    document.querySelectorAll(".service-open").forEach((button) => {
+      const title = button.querySelector(".service-title");
+      const summary = button.querySelector(".service-summary");
+      if (title && !title.textContent.trim() && button.dataset.serviceTitle) {
+        title.textContent = button.dataset.serviceTitle;
+      }
+      if (summary && !summary.textContent.trim() && button.dataset.serviceSummary) {
+        summary.textContent = button.dataset.serviceSummary;
+      }
     });
 
     const themes = {
@@ -602,6 +937,18 @@
       group.append(link);
     });
     applyHeroVideos(content.heroVideos);
+    const sectionMargin = Number(content.sectionMargin);
+    if (Number.isFinite(sectionMargin) && sectionMargin > 0) {
+      const px = Math.max(0, Math.min(160, Math.round(sectionMargin)));
+      document.body.classList.add("cms-uniform-section-margin");
+      document.documentElement.style.setProperty("--cms-section-margin", `${px}px`);
+      document.querySelectorAll("main > section").forEach((section) => {
+        section.style.setProperty("padding-inline", `${px}px`);
+      });
+    } else {
+      document.body.classList.remove("cms-uniform-section-margin");
+      document.documentElement.style.removeProperty("--cms-section-margin");
+    }
     const seo = content.seo || {};
     if (typeof seo.title === "string" && seo.title.trim()) {
       document.title = seo.title.trim().slice(0, 70);
@@ -647,6 +994,7 @@
         if (emptyMessage) emptyMessage.hidden = visibleCards.length > 0;
       });
     });
+    injectCustomPageNav(rawContent);
   };
 
   window.addEventListener("resize", () => {

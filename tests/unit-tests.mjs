@@ -5,7 +5,7 @@
  * the same way the browser runs them.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 
@@ -45,6 +45,7 @@ class ClassList {
 class Style {
   constructor() { this.properties = {}; }
   setProperty(name, value) { this.properties[name] = value; }
+  getPropertyValue(name) { return this.properties[name] ?? ""; }
   removeProperty(name) { delete this.properties[name]; }
 }
 const styleProxyHandler = {
@@ -96,7 +97,10 @@ class FakeNode {
     nodes.forEach((node) => this.append(node));
   }
   remove() {
-    if (this.parentNode) this.parentNode.childNodes = this.parentNode.childNodes.filter((n) => n !== this);
+    if (this.parentNode) {
+      this.parentNode.childNodes = this.parentNode.childNodes.filter((n) => n !== this);
+      this.parentNode = null;
+    }
   }
   setAttribute(name, value) {
     this._attributes.set(name, String(value));
@@ -160,6 +164,9 @@ class FakeNode {
   set textContent(value) { this._text = String(value); this.childNodes = []; }
   get innerHTML() { return this.textContent; }
   get parentElement() { return this.parentNode; }
+  get children() {
+    return this.childNodes.filter((child) => child && child.tagName && !String(child.tagName).startsWith("#"));
+  }
   getClientRects() { return [{}]; }
   getBoundingClientRect() {
     return { left: 0, top: 0, right: 400, bottom: 300, width: 400, height: 300, x: 0, y: 0, toJSON() { return this; } };
@@ -321,6 +328,9 @@ class FakeDocument extends FakeNode {
 }
 
 class FakeWindow {
+  constructor() {
+    this.location = { pathname: "/admin.html", search: "", href: "/admin.html", assign() { }, reload() { } };
+  }
   addEventListener() { }
   matchMedia() { return { matches: false }; }
   requestAnimationFrame(callback) { return setTimeout(callback, 0); }
@@ -360,6 +370,7 @@ FakeCrypto.counter = 0;
 const document = new FakeDocument();
 const window = new FakeWindow();
 const localStorage = new FakeStorage();
+const sessionStorage = new FakeStorage();
 const crypto = new FakeCrypto();
 
 class FakeCustomEvent {
@@ -374,6 +385,7 @@ const sandbox = {
   document,
   window,
   localStorage,
+  sessionStorage,
   crypto,
   Option: FakeOption,
   CustomEvent: FakeCustomEvent,
@@ -404,6 +416,7 @@ const makeTagClass = (tagName) => {
   });
   return TagClass;
 };
+sandbox.Element = makeTagClass("ANY_ELEMENT");
 sandbox.HTMLElement = makeTagClass("ANY_ELEMENT");
 sandbox.HTMLImageElement = makeTagClass("IMG");
 sandbox.HTMLVideoElement = makeTagClass("VIDEO");
@@ -437,10 +450,12 @@ const buildPage = () => {
   document.childNodes = [];
   document.head = new FakeNode("head");
   document.body = new FakeNode("body");
+  document.documentElement = document.body;
   document.append(document.head, document.body);
   documentKeyHandlers.length = 0;
   FakeCrypto.counter = 0;
   localStorage.map.clear();
+  sessionStorage.map.clear();
   const main = new FakeNode("main");
   const hero = new FakeNode("section");
   hero.id = "home";
@@ -459,9 +474,53 @@ const buildPage = () => {
   image.className = "project-shot";
   image.src = "/assets/images/a.jpg";
   about.append(image);
-  main.append(hero, about);
+  const work = new FakeNode("section");
+  work.id = "work";
+  work.className = "portfolio-section";
+  const portfolioGrid = new FakeNode("div");
+  portfolioGrid.className = "portfolio-grid";
+  const projectCard = new FakeNode("article");
+  projectCard.className = "project-card";
+  projectCard.id = "project-demo";
+  const projectTitle = new FakeNode("h3");
+  projectTitle.textContent = "Demo portfolio project";
+  const projectImageWrap = new FakeNode("div");
+  projectImageWrap.className = "project-image-wrap";
+  const projectImage = new FakeNode("img");
+  projectImage.src = "/assets/images/project.jpg";
+  projectImageWrap.append(projectImage);
+  projectCard.append(projectImageWrap, projectTitle);
+  portfolioGrid.append(projectCard);
+  work.append(portfolioGrid);
+  const services = new FakeNode("section");
+  services.id = "services";
+  services.className = "services-section";
+  const servicesGrid = new FakeNode("div");
+  servicesGrid.className = "services-grid";
+  const serviceCard = new FakeNode("article");
+  serviceCard.className = "service-card";
+  const serviceOpen = new FakeNode("button");
+  serviceOpen.className = "service-open";
+  serviceOpen.dataset.serviceTitle = "Brand activations & ambassadors";
+  const serviceNumber = new FakeNode("span");
+  serviceNumber.className = "service-number";
+  serviceNumber.textContent = "01";
+  const serviceTitle = new FakeNode("span");
+  serviceTitle.className = "service-title";
+  serviceTitle.textContent = "Brand activations & ambassadors";
+  const serviceSummary = new FakeNode("span");
+  serviceSummary.className = "service-summary";
+  serviceSummary.textContent = "Turn a live moment into a real conversation.";
+  serviceOpen.append(serviceNumber, serviceTitle, serviceSummary);
+  serviceCard.append(serviceOpen);
+  servicesGrid.append(serviceCard);
+  services.append(servicesGrid);
+  main.append(hero, about, work, services);
   document.append(main);
-  return { main, hero, heroVideo, heroTitle, about, aboutHeading, image };
+  return {
+    main, hero, heroVideo, heroTitle, about, aboutHeading, image, work, services,
+    portfolioGrid, projectCard, projectImage, servicesGrid, serviceCard, serviceOpen, serviceTitle,
+  };
 };
 
 const cleanState = () => ({
@@ -502,6 +561,8 @@ const pressKey = (editor, { key, ctrl = false, shift = false, alt = false, targe
     shiftKey: shift,
     target: target || editor.byId("admin-publish"),
     preventDefault: () => { event.prevented = true; },
+    stopPropagation: () => { event.propagationStopped = true; },
+    stopImmediatePropagation: () => { event.immediatePropagationStopped = true; },
   };
   documentKeyHandlers.forEach((handler) => handler(event));
   return event;
@@ -724,7 +785,7 @@ test("font-size increase and decrease shortcuts", async () => {
 test("shape shortcuts add rectangle, circle, line, and sticky note", async () => {
   buildPage();
   const editor = await loadEditor();
-  ["r", "c", "l", "s"].forEach((key) => pressKey(editor, { key }));
+  ["r", "o", "l", "s"].forEach((key) => pressKey(editor, { key }));
   const shapes = editor.state.shapes;
   assert.equal(shapes.map((shape) => shape.kind).join(","), "rectangle,circle,line,note");
   const note = document.querySelector(".cms-shape-note");
@@ -834,7 +895,9 @@ test("snap controls enable for media and stay disabled otherwise", async () => {
   const editor = await loadEditor();
   assert.ok(editor.byId("admin-snap-even"), "even snap control exists");
   assert.ok(editor.byId("admin-snap-section"), "section snap control exists");
+  assert.ok(editor.byId("admin-snap-match-size"), "match-size snap control exists");
   assert.ok(editor.byId("admin-snap-enabled"), "live snap checkbox exists");
+  assert.ok(editor.byId("admin-snap-size"), "size snap checkbox exists");
   assert.ok(editor.byId("admin-show-grid"), "grid checkbox exists");
   const image = document.querySelector(".project-shot");
   assert.equal(image.tagName, "IMG");
@@ -843,6 +906,102 @@ test("snap controls enable for media and stay disabled otherwise", async () => {
   // Directly verify media detection path used by snap enablement.
   const mediaSelected = image.tagName === "IMG";
   assert.equal(mediaSelected, true, "selected node is media");
+  assert.equal(editor.byId("admin-snap-match-size").disabled, false);
+});
+
+test("shift-preserve multi-select keeps prior selection until clearSelection", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const heading = document.querySelector("#about h2");
+  const image = document.querySelector(".project-shot");
+  editor.assignContentIds();
+  editor.selectElement(heading);
+  editor.selectElement(image, { preserve: true });
+  assert.equal(heading.classList.contains("cms-highlight"), true);
+  assert.equal(image.classList.contains("cms-highlight"), true);
+  assert.equal(image.classList.contains("cms-multi-selected"), true);
+  editor.clearSelection();
+  assert.equal(editor.selected, null);
+  assert.equal(heading.classList.contains("cms-highlight"), false);
+});
+
+test("undo/redo keybinds remain Ctrl/Cmd+Z and Ctrl/Cmd+Y", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const heading = document.querySelector("#about h2");
+  editor.selectElement(heading);
+  const textInput = editor.byId("admin-text");
+  textInput.value = "Keybind undo check";
+  textInput.dispatchEvent(new Event("input"));
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  pressKey(editor, { key: "z", ctrl: true });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(heading.textContent, "About heading");
+  pressKey(editor, { key: "y", ctrl: true });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(heading.textContent, "Keybind undo check");
+});
+
+test("snapResizeDimensions locks to nearby image sizes", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  editor.assignContentIds();
+  const image = document.querySelector(".project-shot");
+  editor.applyImageResize(image, { width: 400, height: 260, offsetX: 0, offsetY: 0 });
+  image.getBoundingClientRect = () => ({ width: 400, height: 260, left: 0, top: 0, right: 400, bottom: 260 });
+  editor.imageFrameFor(image).getBoundingClientRect = () => ({ width: 400, height: 260, left: 0, top: 0, right: 400, bottom: 260 });
+  const snapped = editor.snapResizeDimensions(403, 258, []);
+  assert.equal(snapped.width, 400);
+  assert.equal(snapped.height, 260);
+  assert.equal(snapped.snappedW, true);
+  assert.equal(snapped.snappedH, true);
+});
+
+test("preview mode can exit and restores edit mode", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  editor.setPreviewMode(true, { announce: false });
+  assert.equal(document.body.classList.contains("cms-preview-mode"), true);
+  assert.equal(editor.byId("admin-preview-exit").hidden, false);
+  editor.setPreviewMode(false, { announce: false });
+  assert.equal(document.body.classList.contains("cms-preview-mode"), false);
+  assert.equal(editor.byId("admin-preview-exit").hidden, true);
+  assert.equal(editor.byId("admin-preview-toggle").textContent, "Preview draft");
+});
+
+test("brand kits can save, load, and apply custom colours", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  editor.state.brandKit.colors = ["#112233", "#445566"];
+  editor.byId("admin-brand-kit-name").value = "Field Kit";
+  editor.renderBrandKitUi();
+  editor.byId("admin-brand-save-kit").click();
+  const saved = editor.state.brandKit.kits.find((kit) => kit.name === "Field Kit");
+  assert.ok(saved, "custom kit was saved");
+  assert.equal(saved.colors.join(","), "#112233,#445566");
+  editor.state.brandKit.colors = ["#000000", "#ffffff"];
+  editor.byId("admin-brand-kit-select").value = "Field Kit";
+  editor.byId("admin-brand-load-kit").click();
+  assert.equal(editor.state.brandKit.colors.join(","), "#112233,#445566");
+  editor.byId("admin-apply-brand-theme").click();
+  assert.equal(document.documentElement.style.getPropertyValue("--forest"), "#112233");
+});
+
+test("uploads content blocks accept image src aliases", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const block = {
+    id: "content-block-upload-test",
+    type: "image",
+    sectionId: "work",
+    src: "/uploads/demo.jpg",
+    alt: "Demo",
+  };
+  editor.state.contentBlocks.push(block);
+  editor.addContentBlock(block);
+  const image = document.querySelector(`[data-cms-id="${block.id}-image"]`);
+  assert.ok(image, "upload image node was created");
+  assert.equal(image.getAttribute("src") || image.src, "/uploads/demo.jpg");
 });
 
 test("toolbar badge is a clickable restore control", async () => {
@@ -850,11 +1009,29 @@ test("toolbar badge is a clickable restore control", async () => {
   const editor = await loadEditor();
   editor.byId("admin-collapse").click();
   assert.equal(editor.byId("admin-collapse").textContent, "Show tools");
+  assert.equal(editor.byId("admin-restore-tools").hidden, false, "restore FAB appears when tools hide");
   const mark = document.querySelector(".admin-mark");
   assert.ok(mark, "administrator badge exists in the page");
   assert.equal(mark.getAttribute("role"), "button", "badge is keyboard/click reachable");
   mark.click();
   assert.equal(editor.byId("admin-collapse").textContent, "Hide tools", "badge click restores the toolbar");
+  assert.equal(editor.byId("admin-restore-tools").hidden, true, "restore FAB hides after restore");
+});
+
+test("equal gap snap centers between adjacent neighbors and reports markers", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const result = editor.equalGapSnap(
+    { left: 118, top: 10, width: 40, height: 20 },
+    [
+      { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40, centerX: 50, centerY: 20 },
+      { left: 180, top: 0, right: 280, bottom: 40, width: 100, height: 40, centerX: 230, centerY: 20 },
+    ],
+    10,
+  );
+  assert.equal(result.left, 120);
+  assert.equal(result.snappedX, true);
+  assert.ok(result.markers.length >= 2, "equal gap markers are produced");
 });
 
 test("missing-image fallback marks broken sources for the replace hint", () => {
@@ -919,6 +1096,325 @@ test("server validation accepts shapes and rejects malformed shapes", async () =
   const source = readFileSync(path.join(ROOT, "local_preview.rb"), "utf8");
   assert.ok(source.includes('valid_shapes'), "shape validation exists");
   assert.ok(source.includes('content["shapes"]'), "publish route reads the shapes array");
+});
+
+test("delete control enables for non-main selections", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const image = document.querySelector(".project-image-wrap img, .project-shot");
+  editor.selectElement(image);
+  assert.equal(editor.byId("admin-delete").disabled, false, "portfolio images can be deleted");
+  const main = document.querySelector("main");
+  editor.selectElement(main);
+  assert.equal(editor.byId("admin-delete").disabled, true, "main page root cannot be deleted");
+});
+
+test("hold-c temporarily disables snap", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  pressKey(editor, { key: "c" });
+  assert.ok(document.body.classList.contains("cms-snap-hold-off"), "snap hold class is applied");
+});
+
+test("editor exposes addService, deleteSelectedElements, and openFloatToolbar", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  assert.equal(typeof editor.addService, "function");
+  assert.equal(typeof editor.deleteSelectedElements, "function");
+  assert.equal(typeof editor.openFloatToolbar, "function");
+});
+
+test("canva shell elements rail includes add service card control", () => {
+  const source = readFileSync(path.join(ROOT, "assets", "js", "admin-canva-shell.js"), "utf8");
+  assert.ok(
+    source.includes('id="admin-quick-add-service"') || source.includes('id="admin-canva-add-service"'),
+    "Add service button exists in canva elements panel HTML",
+  );
+  assert.ok(source.includes("Add service card"), "button label is visible");
+});
+
+test("card-frame image resize clears missing marker", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const image = document.querySelector(".project-image-wrap img, .project-shot");
+  image.classList.add("cms-image-missing");
+  editor.applyImageResize(image, { width: 400, height: 300, offsetX: 0, offsetY: 0 });
+  assert.equal(image.classList.contains("cms-image-missing"), false);
+});
+
+test("hold-c keydown prevents default browser behavior", () => {
+  const source = readFileSync(path.join(ROOT, "assets", "js", "admin.js"), "utf8");
+  assert.ok(source.includes("snapHoldOff = true") && source.includes("event.preventDefault()"), "hold-c uses preventDefault");
+  assert.ok(source.includes("stopPropagation"), "hold-c stops propagation");
+});
+
+test("public renderer uses stable portfolio image ids", () => {
+  const source = readFileSync(path.join(ROOT, "assets", "js", "site-content.js"), "utf8");
+  assert.ok(source.includes("projectCard.id}-image"), "portfolio images get stable cms ids");
+});
+
+test("Build your page lists portfolio and service cards with Remove controls", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  editor.renderCardLists();
+  const portfolioList = editor.byId("admin-portfolio-cards");
+  const serviceList = editor.byId("admin-service-cards");
+  assert.ok(portfolioList, "portfolio card list exists in Build your page");
+  assert.ok(serviceList, "service card list exists in Build your page");
+  assert.ok(
+    portfolioList.textContent.includes("Demo portfolio project"),
+    "portfolio list shows project titles",
+  );
+  assert.ok(
+    serviceList.textContent.includes("Brand activations & ambassadors"),
+    "service list shows service titles",
+  );
+  const portfolioRemove = portfolioList.querySelectorAll("button").find((button) => button.textContent === "Remove");
+  const serviceRemove = serviceList.querySelectorAll("button").find((button) => button.textContent === "Remove");
+  assert.ok(portfolioRemove, "portfolio rows expose Remove");
+  assert.ok(serviceRemove, "service rows expose Remove");
+});
+
+test("removePageCard hides built-in portfolio and service cards", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  editor.assignContentIds();
+  editor.renderCardLists();
+
+  assert.equal(fixture.projectCard.hidden, false);
+  editor.removePageCard(fixture.projectCard, "portfolio");
+  assert.equal(fixture.projectCard.hidden, true, "built-in portfolio card is hidden");
+  assert.equal(
+    Boolean(editor.state.edits[fixture.projectCard.dataset.cmsId]?.deleted),
+    true,
+    "portfolio removal is persisted as deleted",
+  );
+
+  assert.equal(fixture.serviceCard.hidden, false);
+  editor.removePageCard(fixture.serviceCard, "service");
+  assert.equal(fixture.serviceCard.hidden, true, "built-in service card is hidden");
+  assert.equal(
+    Boolean(editor.state.edits[fixture.serviceCard.dataset.cmsId]?.deleted),
+    true,
+    "service removal is persisted as deleted",
+  );
+});
+
+test("resolveDeleteTarget removes whole service card for non-media selection", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  const resolvedTitle = editor.resolveDeleteTarget(fixture.serviceTitle);
+  assert.equal(resolvedTitle, fixture.serviceCard, "service title resolves to the card");
+  const resolvedOpen = editor.resolveDeleteTarget(fixture.serviceOpen);
+  assert.equal(resolvedOpen, fixture.serviceCard, "service button resolves to the card");
+  const resolvedImage = editor.resolveDeleteTarget(fixture.projectImage);
+  assert.equal(resolvedImage, fixture.projectImage, "portfolio photos stay independently deletable");
+});
+
+test("deleting a custom service card removes it from state and the grid", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  const custom = {
+    id: "custom-test-service",
+    title: "Custom hosting",
+    summary: "A custom card",
+    description: "Full detail",
+    example: "Example",
+    image: "/assets/images/custom.jpg",
+    alt: "Custom hosting",
+  };
+  editor.state.services.push(custom);
+  editor.addServiceCard(custom);
+  const card = document.getElementById(`service-${custom.id}`);
+  assert.ok(card, "custom service card is rendered");
+  assert.equal(fixture.servicesGrid.children.length, 2);
+
+  editor.deleteElements([card]);
+  assert.equal(document.getElementById(`service-${custom.id}`), null, "custom card leaves the DOM");
+  assert.equal(editor.state.services.some((service) => service.id === custom.id), false);
+  assert.equal(fixture.servicesGrid.children.length, 1, "only the built-in card remains");
+});
+
+test("selectionKind and syncRelevantControls hide text tools for images", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  assert.equal(editor.selectionKind(fixture.projectImage), "media");
+  assert.equal(editor.selectionKind(fixture.aboutHeading), "text");
+  assert.equal(editor.selectionKind(fixture.work), "section");
+  editor.selectElement(fixture.projectImage);
+  const textBox = editor.byId("admin-text")?.closest("[data-relevant]");
+  const mediaBtn = editor.byId("admin-replace-media");
+  const widthBox = editor.byId("admin-width")?.closest("[data-relevant]");
+  const fontSize = editor.byId("admin-font-size")?.closest("[data-relevant]");
+  const hrefField = editor.byId("admin-href")?.closest("[data-relevant]");
+  assert.ok(textBox?.classList.contains("admin-relevant-hidden"), "text field hidden for images");
+  assert.equal(mediaBtn?.classList.contains("admin-relevant-hidden"), false, "media tools stay for images");
+  assert.equal(widthBox?.classList.contains("admin-relevant-hidden"), false, "width stays for media");
+  assert.ok(fontSize?.classList.contains("admin-relevant-hidden"), "font size hidden for images");
+  editor.selectElement(fixture.aboutHeading);
+  assert.equal(mediaBtn?.classList.contains("admin-relevant-hidden"), true, "media tools hide for text");
+  assert.equal(textBox?.classList.contains("admin-relevant-hidden"), false, "text tools show for text");
+  assert.ok(widthBox?.classList.contains("admin-relevant-hidden"), "width hidden for plain text");
+  assert.ok(hrefField?.classList.contains("admin-relevant-hidden"), "href hidden for plain text");
+  assert.equal(editor.byId("admin-font-size")?.disabled, false, "font size enabled for text");
+  assert.equal(mediaBtn?.disabled, true, "replace disabled when hidden for text");
+});
+
+test("context tools switch correctly across media, link, and section", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  const link = document.createElement("a");
+  link.className = "button button-dark";
+  link.setAttribute("href", "#book");
+  link.textContent = "Book";
+  document.querySelector("main").append(link);
+  editor.assignContentIds();
+
+  editor.selectElement(fixture.projectImage);
+  assert.equal(editor.byId("admin-replace-media").disabled, false);
+  assert.ok(editor.byId("admin-bold").closest("[data-relevant]").classList.contains("admin-relevant-hidden"));
+
+  editor.selectElement(link);
+  assert.equal(editor.selectionKind(link), "link");
+  assert.equal(editor.byId("admin-href").disabled, false, "href enabled for buttons");
+  assert.equal(editor.byId("admin-href").closest("[data-relevant]").classList.contains("admin-relevant-hidden"), false);
+  assert.equal(editor.byId("admin-text").closest("[data-relevant]").classList.contains("admin-relevant-hidden"), false, "text tools for links");
+  assert.ok(editor.byId("admin-replace-media").classList.contains("admin-relevant-hidden"));
+
+  editor.selectElement(fixture.work);
+  assert.equal(editor.selectionKind(fixture.work), "section");
+  assert.equal(editor.byId("admin-section-height-hint").hidden, false);
+  assert.ok(editor.byId("admin-text").closest("[data-relevant]").classList.contains("admin-relevant-hidden"));
+  assert.ok(editor.byId("admin-replace-media").classList.contains("admin-relevant-hidden"));
+  assert.equal(editor.byId("admin-height").closest("[data-relevant]").classList.contains("admin-relevant-hidden"), false);
+});
+
+test("section min-height can be lengthened from the editor", async () => {
+  const fixture = buildPage();
+  const editor = await loadEditor();
+  editor.selectElement(fixture.work);
+  editor.applySectionMinHeight(fixture.work, 720);
+  assert.equal(editor.state.edits[fixture.work.dataset.cmsId].styles.minHeight, 720);
+  assert.equal(fixture.work.style.minHeight, "720px");
+  editor.syncSectionResizeHandle(fixture.work);
+  assert.ok(fixture.work.querySelector(".cms-section-resize-handle"), "section gets a resize handle");
+  assert.ok(fixture.work.querySelector(".cms-section-resize-dock"), "section gets a resize dock with typed fields");
+  assert.ok(fixture.work.querySelector(".cms-section-height-input"), "length can be typed while resizing");
+  assert.ok(fixture.work.querySelector(".cms-section-margin-input"), "margin can be typed while resizing");
+});
+
+test("elements without a stable id can still be deleted", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const stray = document.createElement("div");
+  stray.className = "cms-added-content-block";
+  stray.textContent = "temp";
+  document.querySelector("main").append(stray);
+  assert.equal(editor.deleteElements([stray]), true);
+  assert.ok(stray.hidden || !stray.parentNode || stray.style.display === "none");
+});
+
+test("float toolbar closes only via the X button and wires Resize", () => {
+  const source = readFileSync(path.join(ROOT, "assets", "js", "admin-power-tools.js"), "utf8");
+  assert.ok(source.includes("Close only with"), "X-only close hint is present");
+  assert.ok(source.includes("Intentionally no outside-click"), "outside click close is disabled");
+  assert.ok(source.includes('data-float="resize"'), "resize control exists");
+  assert.ok(source.includes("setImageTool"), "resize calls setImageTool directly");
+  assert.ok(source.includes("placeFloat"), "float placement avoids sidebar overlap");
+});
+
+test("WCAG 1.4.10 reflow rules exist for mobile and editor preview", () => {
+  const site = readFileSync(path.join(ROOT, "assets", "css", "site.css"), "utf8");
+  const admin = readFileSync(path.join(ROOT, "assets", "css", "admin.css"), "utf8");
+  assert.ok(site.includes("@media (max-width: 680px)"), "primary mobile breakpoint exists");
+  assert.ok(site.includes("overflow-wrap: break-word"), "text wraps on narrow viewports");
+  assert.ok(admin.includes("cms-preview-mobile") && admin.includes("font-size: 36px"), "editor mobile preview uses phone-sized type");
+  assert.ok(!site.includes("white-space: normal !important"), "mobile CSS does not force white-space normal");
+});
+
+test("button links are editable and crop defaults off until requested", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const link = document.createElement("a");
+  link.className = "button button-dark";
+  link.setAttribute("href", "#contact");
+  link.textContent = "Get to know each other";
+  document.querySelector("main").append(link);
+  editor.assignContentIds();
+  editor.selectElement(link);
+  assert.equal(editor.selectionKind(link), "link");
+  assert.equal(editor.byId("admin-href").disabled, false, "href field enabled for buttons");
+  assert.equal(editor.byId("admin-href").value, "#contact");
+  const power = readFileSync(path.join(ROOT, "assets", "js", "admin-power-tools.js"), "utf8");
+  assert.ok(power.includes('data-float="replace"'), "float toolbar exposes Replace");
+  const enhancements = readFileSync(path.join(ROOT, "assets", "js", "admin-enhancements.js"), "utf8");
+  assert.ok(enhancements.includes('activeImageTool = "none"'), "crop/resize start off");
+});
+
+test("section remove and add page controls are available", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  assert.ok(editor.byId("admin-add-page"), "Add page button exists");
+  assert.ok(editor.byId("admin-custom-pages"), "custom pages list exists");
+  assert.equal(typeof editor.addCustomPage, "function");
+  assert.equal(typeof editor.ensureImageCropFrame, "function");
+  const admin = readFileSync(path.join(ROOT, "assets", "js", "admin.js"), "utf8");
+  assert.ok(admin.includes("admin-section-delete"), "section Remove uses delete styling");
+  assert.ok(admin.includes("toggleSectionVisibility(target)"), "built-in sections soft-remove via Hide");
+});
+
+test("uploaded image crop frame stays clipped", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const section = document.querySelector("main > section") || document.querySelector("main");
+  const figure = document.createElement("figure");
+  figure.className = "cms-added-content-block cms-added-image";
+  figure.id = "content-block-crop-test";
+  figure.dataset.cmsId = figure.id;
+  const image = document.createElement("img");
+  image.dataset.cmsId = `${figure.id}-image`;
+  image.src = "/assets/images/captain-campaign-logo.png";
+  image.width = 320;
+  image.height = 200;
+  figure.append(image);
+  section.append(figure);
+  Object.defineProperty(image, "getBoundingClientRect", {
+    value: () => ({ width: 320, height: 200, top: 0, left: 0, right: 320, bottom: 200 }),
+  });
+  editor.ensureImageCropFrame(image);
+  const edit = editor.state.edits[image.dataset.cmsId];
+  assert.ok(edit?.resize?.width >= 40, "crop locks a width");
+  assert.ok(edit?.resize?.height >= 30, "crop locks a height");
+  assert.equal(figure.style.overflow, "hidden");
+  assert.equal(figure.style.width, `${edit.resize.width}px`);
+  assert.notEqual(image.style.width, "100vw");
+});
+
+test("uniform section margin control exists in Build your page", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  assert.ok(editor.byId("admin-section-margin"), "margin input exists");
+  assert.ok(editor.byId("admin-apply-section-margin"), "apply margin button exists");
+  assert.ok(editor.byId("admin-replace-hero-video"), "replace hero video control exists");
+  editor.applyUniformSectionMargin(24);
+  assert.equal(editor.state.sectionMargin, 24);
+  assert.equal(document.body.classList.contains("cms-uniform-section-margin"), true);
+});
+
+test("Cursor AI region select and assist wiring exists", async () => {
+  buildPage();
+  await loadEditor();
+  const enhancements = readFileSync(path.join(ROOT, "assets", "js", "admin-enhancements.js"), "utf8");
+  const preview = readFileSync(path.join(ROOT, "local_preview.rb"), "utf8");
+  assert.ok(enhancements.includes('fieldset("Cursor AI"'), "Cursor AI tool group exists");
+  assert.ok(enhancements.includes("Select region on page"), "region select button label");
+  assert.ok(enhancements.includes("captureRegionScreenshot"), "region screenshot capture");
+  assert.ok(enhancements.includes("/api/cursor-assist"), "client posts to cursor-assist");
+  assert.ok(enhancements.includes("applyCursorActions"), "applies returned edit plan");
+  assert.ok(preview.includes('/api/cursor-assist'), "server exposes cursor-assist");
+  assert.ok(preview.includes("call_cursor_sdk_assist"), "Cursor SDK bridge wired");
+  assert.ok(preview.includes("html2canvas"), "html2canvas loaded for screenshots");
+  assert.ok(existsSync(path.join(ROOT, "scripts", "cursor-ai-assist.mjs")), "Cursor SDK helper script present");
 });
 
 /* ---------- summary ---------- */

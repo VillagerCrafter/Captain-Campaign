@@ -22,6 +22,7 @@ layout: null
       data-content-url="{{ '/site-content.json' | relative_url }}"
       data-site-baseurl="{{ site.baseurl | escape }}">{{ site.data.projects | jsonify }}</script>
     <script src="{{ '/assets/js/case-study.js' | relative_url }}" defer></script>
+    <script src="{{ '/assets/js/site.js' | relative_url }}" defer></script>
     {% if site.ga4_measurement_id and site.ga4_measurement_id != "" %}
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.ga4_measurement_id }}"></script>
     <script>
@@ -72,6 +73,7 @@ layout: null
           </div>
         </div>
         <p class="page-width case-study-status" id="case-study-status" role="status" aria-live="polite"></p>
+        <div class="page-width" id="case-study-photo-layout" aria-label="Project photo layout"></div>
       </section>
       <section class="case-study-next section-pad">
         <div class="page-width">

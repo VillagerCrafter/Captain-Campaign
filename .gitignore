@@ -17,3 +17,6 @@ vendor/
 # Local website editor output and uploaded drafts
 _admin_preview/
 site-content.local.json
+
+# Cursor AI SDK for the local editor
+node_modules/

@@ -1,0 +1,11 @@
+{
+  "name": "liam-site-editor",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.27"
+  }
+}

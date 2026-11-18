@@ -3,7 +3,7 @@
   if (!editor) return;
 
   const button = (id, label, extra = "") => `<button type="button" id="${id}" class="${extra}">${label}</button>`;
-  const fieldset = (title, body, id) => `<details class="admin-tool-group editor-tool-group"><summary>${title}</summary><div class="editor-feature-body" id="${id}">${body}</div></details>`;
+  const fieldset = (title, body, id, relevant = "") => `<details class="admin-tool-group editor-tool-group"${relevant ? ` data-relevant="${relevant}"` : ""}><summary>${title}</summary><div class="editor-feature-body" id="${id}">${body}</div></details>`;
   const tools = document.createElement("section");
   tools.className = "editor-extensions";
   tools.innerHTML = `
@@ -35,7 +35,7 @@
           ${button("editor-image-crop-mode", "Crop by dragging")}
           ${button("editor-image-resize-mode", "Resize by dragging")}
         </div>
-      `, "editor-crop-body")}
+      `, "editor-crop-body", "media")}
       ${fieldset("Rotating hero videos", `
         <strong id="editor-video-count" class="editor-video-count">0 / 12 videos</strong>
         <label for="editor-video-interval">Seconds per video</label>
@@ -58,7 +58,7 @@
         ${button("editor-add-photos", "Add photos to rotator")}
         <div id="editor-photo-list" class="editor-item-list"></div>
         <small>The photo array applies to the selected image. Other animation presets apply to the selected element.</small>
-      `, "editor-animation-body")}
+      `, "editor-animation-body", "any")}
       ${fieldset("Add a button", `
         <label for="editor-button-label">Button text</label><input id="editor-button-label" maxlength="80" placeholder="Explore my work">
         <label for="editor-button-link">Page section or secure URL</label><input id="editor-button-link" placeholder="#work or https://example.com">
@@ -66,10 +66,10 @@
         ${button("editor-add-button", "Add button")}
         <div id="editor-button-list" class="editor-item-list"></div>
       `, "editor-button-body")}
-      ${fieldset("AI copy assistant", `
-        <p>Drag across a section’s heading or paragraph to choose the exact copy, then ask Claude for three alternatives. Nothing changes until you choose and apply an option.</p>
-        ${button("editor-ai-select", "Select copy on page")}
-        <small>Requires an Anthropic API key entered when starting the local editor.</small>
+      ${fieldset("Cursor AI", `
+        <p>Drag across any part of the page to highlight a region. A temporary screenshot of that selection is sent with your prompt so Cursor AI can propose visual edits.</p>
+        ${button("editor-ai-select", "Select region on page")}
+        <small>Prefer <code>CURSOR_API_KEY</code>. Falls back to Anthropic vision when only <code>LIAM_ANTHROPIC_API_KEY</code> is set. Nothing changes until you apply the plan.</small>
       `, "editor-ai-body")}
     </div>
     <div id="editor-elements-panel" role="tabpanel" aria-labelledby="editor-elements-tab" hidden>
@@ -178,10 +178,13 @@
     const image = editor.selected;
     if (!(image instanceof HTMLImageElement)) return;
     const edit = editor.currentEdit();
+    if (!edit) return;
+    editor.ensureImageCropFrame?.(image);
     edit.crop = {
       fit: byId("editor-crop-fit").value,
       x: Number(byId("editor-crop-x").value),
       y: Number(byId("editor-crop-y").value),
+      zoom: Math.max(100, Math.min(220, Number(edit.crop?.zoom) || 100)),
     };
     image.style.objectFit = edit.crop.fit;
     image.style.objectPosition = `${edit.crop.x}% ${edit.crop.y}%`;
@@ -215,13 +218,45 @@
     <button type="button" data-image-tool="resize">Resize — drag handles</button>
     <button type="button" data-image-tool="close">Close</button>`;
   document.body.append(imageContextMenu);
-  let activeImageTool = "resize";
+  let activeImageTool = "none";
   const setImageTool = (tool) => {
-    activeImageTool = tool;
-    document.body.classList.toggle("cms-crop-mode", tool === "crop");
-    status(tool === "crop" ? "Crop mode: drag the image to choose its focus." : "Resize mode: drag the image handles.");
+    activeImageTool = tool === "crop" ? "crop" : tool === "resize" ? "resize" : "none";
+    let image = editor.selected;
+    // Only retarget when entering crop/resize, and only to an image inside the current selection.
+    // A global #dialog-image fallback stole service-title clicks and jumped the page to the footer.
+    if (!(image instanceof HTMLImageElement) && activeImageTool !== "none") {
+      const found = image?.closest?.(".project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image, .dialog-image, .cms-added-image, .cms-stock-image")?.querySelector("img")
+        || image?.querySelector?.("img")
+        || null;
+      if (found instanceof HTMLImageElement && found.isConnected && found.getClientRects().length) {
+        const previousTool = activeImageTool;
+        editor.selectElement(found);
+        activeImageTool = previousTool;
+        image = found;
+      }
+    }
+    if (activeImageTool === "crop" && image instanceof HTMLImageElement) {
+      // Freeze the current display box so cover/pan crop cannot blow uploads up to full viewport.
+      editor.ensureImageCropFrame?.(image);
+      editor.saveDraft?.();
+    }
+    document.body.classList.toggle("cms-crop-mode", activeImageTool === "crop");
+    document.body.classList.toggle("cms-resize-mode", activeImageTool === "resize");
+    if (activeImageTool === "crop") status("Crop mode on — drag to pan focus inside the frame. Size stays fixed; use Resize to change dimensions.");
+    else if (activeImageTool === "resize") status("Resize mode on — drag the yellow handles.");
+    else {
+      document.body.classList.remove("cms-crop-mode", "cms-resize-mode");
+      if (image instanceof HTMLImageElement) status("Image selected. Click Crop or Resize when you want to adjust it.");
+    }
+    const cropBtn = byId("editor-image-crop-mode");
+    const resizeBtn = byId("editor-image-resize-mode");
+    if (cropBtn) cropBtn.disabled = !(image instanceof HTMLImageElement);
+    if (resizeBtn) resizeBtn.disabled = !(image instanceof HTMLImageElement);
+    window.CaptainCampaignEditor?.refreshMoveable?.();
     syncResizeHandles();
   };
+  editor.setImageTool = setImageTool;
+  editor.clearImageTool = () => setImageTool("none");
   const syncResizeHandles = () => {
     const image = editor.selected;
     resizeLayer.hidden = !(activeImageTool === "resize" && image instanceof HTMLImageElement && image.isConnected);
@@ -308,6 +343,12 @@
     event.preventDefault();
     editor.selectElement(image);
     refreshSelectedControls();
+    // Prefer the floating Edit tools toolbar over the legacy image menu.
+    if (typeof editor.openFloatToolbar === "function") {
+      imageContextMenu.hidden = true;
+      editor.openFloatToolbar(event.clientX, event.clientY);
+      return;
+    }
     imageContextMenu.hidden = false;
     const menuWidth = 210;
     const menuHeight = 150;
@@ -325,10 +366,12 @@
   byId("editor-image-resize-mode").addEventListener("click", () => setImageTool("resize"));
   let cropStart = null;
   document.addEventListener("pointerdown", (event) => {
-    if (activeImageTool !== "crop" || !(editor.selected instanceof HTMLImageElement) ||
-        !editor.selected.contains(event.target) || toolbar.contains(event.target)) return;
+    if (activeImageTool !== "crop" || !(editor.selected instanceof HTMLImageElement) || toolbar.contains(event.target)) return;
     const image = editor.selected;
-    const rect = editor.imageFrameFor(image).getBoundingClientRect();
+    editor.ensureImageCropFrame?.(image);
+    const frame = editor.imageFrameFor(image);
+    if (!frame?.contains?.(event.target)) return;
+    const rect = frame.getBoundingClientRect();
     const edit = state.edits[image.dataset.cmsId] || {};
     cropStart = {
       image,
@@ -337,6 +380,7 @@
       rect,
       cropX: Number(edit.crop?.x ?? byId("editor-crop-x").value),
       cropY: Number(edit.crop?.y ?? byId("editor-crop-y").value),
+      zoom: Number(edit.crop?.zoom || 100),
     };
     event.preventDefault();
     event.stopPropagation();
@@ -347,10 +391,16 @@
     const edit = state.edits[cropStart.image.dataset.cmsId] || (state.edits[cropStart.image.dataset.cmsId] = { styles: {} });
     const x = Math.max(0, Math.min(100, cropStart.cropX - ((event.clientX - cropStart.x) / cropStart.rect.width) * 100));
     const y = Math.max(0, Math.min(100, cropStart.cropY - ((event.clientY - cropStart.y) / cropStart.rect.height) * 100));
-    edit.crop = { fit: "cover", x, y };
-    cropStart.image.style.objectFit = "cover";
+    // Pan focus only — never write width/height during crop.
+    edit.crop = {
+      fit: edit.crop?.fit || "cover",
+      x,
+      y,
+      zoom: Math.max(100, Math.min(220, Number(edit.crop?.zoom ?? cropStart.zoom) || 100)),
+    };
+    cropStart.image.style.objectFit = edit.crop.fit;
     cropStart.image.style.objectPosition = `${x}% ${y}%`;
-    byId("editor-crop-fit").value = "cover";
+    byId("editor-crop-fit").value = edit.crop.fit;
     byId("editor-crop-x").value = x;
     byId("editor-crop-y").value = y;
     byId("editor-crop-x-value").value = `${Math.round(x)}%`;
@@ -747,12 +797,15 @@
               return;
             }
             const targetImage = editor.selected instanceof HTMLImageElement ? editor.selected : null;
-          const section = targetImage?.closest("main > section") || editor.selected?.closest("main > section") ||
-            (editor.selected?.matches("main > section") ? editor.selected : null);
+          const section = targetImage?.closest("main > section")
+            || editor.selected?.closest("main > section")
+            || (editor.selected?.matches("main > section") ? editor.selected : null)
+            || editor.resolvePlacementSection?.();
           if (!targetImage && !section) {
-            status("Select an image to replace, or select a page section where the image should be added.", "error");
+            status("Scroll to a page section first, then add the image.", "error");
             return;
           }
+          if (section) editor.syncBlockTarget?.(section);
           add.disabled = true;
           try {
             const response = await fetch("/api/import-image", {
@@ -863,57 +916,209 @@
   dialog.innerHTML = `
     <form method="dialog">
       <button class="editor-ai-close" value="cancel" aria-label="Close">×</button>
-      <h2>Improve selected copy</h2>
+      <h2>Ask Cursor AI</h2>
       <p class="editor-ai-context"></p>
-      <label for="editor-ai-prompt">What should change?</label>
-      <textarea id="editor-ai-prompt" maxlength="1000" required placeholder="Make this clearer, warmer, shorter, or more focused on bookings."></textarea>
-      <button type="button" class="editor-ai-generate">Generate three options</button>
-      <fieldset class="editor-ai-options" hidden><legend>Choose an option to preview</legend><div></div></fieldset>
+      <figure class="editor-ai-shot-wrap" hidden>
+        <img class="editor-ai-shot" alt="Temporary screenshot of the selected region" />
+        <figcaption>Temporary region screenshot (sent as visual context, not stored)</figcaption>
+      </figure>
+      <label for="editor-ai-prompt">What should Cursor AI change?</label>
+      <textarea id="editor-ai-prompt" maxlength="1000" required placeholder="Make the headline shorter, warm up the tone, tighten spacing, or adjust colors in this region."></textarea>
+      <button type="button" class="editor-ai-generate">Ask Cursor AI</button>
+      <div class="editor-ai-plan" hidden>
+        <p class="editor-ai-summary"></p>
+        <ul class="editor-ai-action-list"></ul>
+      </div>
       <div class="editor-ai-actions">
-        <button type="button" class="editor-ai-apply" disabled>Apply selected option</button>
+        <button type="button" class="editor-ai-apply" disabled>Apply proposed edits</button>
         <button value="cancel">Cancel</button>
       </div>
       <p class="editor-ai-status" role="status" aria-live="polite"></p>
-      <small>Your selected copy and prompt are sent to Anthropic only when you request suggestions. The text is not saved by this editor.</small>
+      <small>The region screenshot and element context are sent only when you ask. Nothing is saved until you apply edits to the draft.</small>
     </form>`;
   document.body.append(dialog);
-  let aiTarget = null;
+  let aiRegion = null;
+  let pendingActions = [];
   const aiSelectButton = byId("editor-ai-select");
   const aiGenerate = dialog.querySelector(".editor-ai-generate");
   const aiStatus = dialog.querySelector(".editor-ai-status");
-  const aiOptions = dialog.querySelector(".editor-ai-options");
+  const aiPlan = dialog.querySelector(".editor-ai-plan");
   const aiApply = dialog.querySelector(".editor-ai-apply");
-  let optionValues = [];
+  const aiShotWrap = dialog.querySelector(".editor-ai-shot-wrap");
+  const aiShot = dialog.querySelector(".editor-ai-shot");
 
-  const finishAiSelection = (start, end) => {
+  const overlapArea = (left, right, top, bottom, rect) => {
+    const width = Math.max(0, Math.min(right, rect.right) - Math.max(left, rect.left));
+    const height = Math.max(0, Math.min(bottom, rect.bottom) - Math.max(top, rect.top));
+    return width * height;
+  };
+
+  const collectRegionElements = (left, right, top, bottom) => {
+    editor.assignContentIds();
+    return [...document.querySelectorAll("[data-cms-id]")]
+      .filter((element) => !element.closest("[data-cms-control], .admin-toolbar, .admin-mark, .editor-ai-dialog"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { element, area: overlapArea(left, right, top, bottom, rect), rect };
+      })
+      .filter((candidate) => candidate.area > 24)
+      .sort((a, b) => b.area - a.area)
+      .slice(0, 24)
+      .map(({ element }) => {
+        const text = (element.innerText || element.getAttribute?.("alt") || "").trim().slice(0, 500);
+        const href = element instanceof HTMLAnchorElement ? (element.getAttribute("href") || "") : "";
+        return {
+          cmsId: element.dataset.cmsId,
+          tag: element.tagName.toLowerCase(),
+          text,
+          href,
+          role: element.getAttribute("role") || element.className?.toString?.().slice(0, 80) || "",
+        };
+      });
+  };
+
+  const pageScroll = () => ({
+    x: window.scrollX || window.pageXOffset || document.documentElement.scrollLeft || 0,
+    y: window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0,
+  });
+
+  const captureRegionScreenshot = async (left, top, width, height) => {
+    if (typeof window.html2canvas !== "function") return "";
+    const scroll = pageScroll();
+    // Convert viewport selection → document coordinates so scrolled pages crop correctly.
+    const docX = Math.max(0, left + scroll.x);
+    const docY = Math.max(0, top + scroll.y);
+    const scale = Math.min(1, 1280 / Math.max(width, 1));
+    const ignore = (element) => Boolean(
+      element?.dataset?.cmsControl === "true"
+      || element?.classList?.contains("admin-toolbar")
+      || element?.classList?.contains("admin-properties")
+      || element?.classList?.contains("admin-rail")
+      || element?.classList?.contains("admin-mark")
+      || element?.classList?.contains("admin-float-toolbar")
+      || element?.classList?.contains("editor-ai-selection-box")
+      || element?.classList?.contains("editor-ai-dialog")
+      || element?.classList?.contains("moveable-control-box"),
+    );
+    // Render the full document, then crop — html2canvas x/y alone ignores scroll on many pages.
+    const full = await window.html2canvas(document.documentElement, {
+      backgroundColor: null,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      scale,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: Math.max(document.documentElement.scrollWidth, document.documentElement.clientWidth),
+      windowHeight: Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight),
+      ignoreElements: ignore,
+    });
+    const sx = Math.round(docX * scale);
+    const sy = Math.round(docY * scale);
+    const sw = Math.max(1, Math.round(width * scale));
+    const sh = Math.max(1, Math.round(height * scale));
+    const crop = document.createElement("canvas");
+    crop.width = sw;
+    crop.height = sh;
+    const ctx = crop.getContext("2d");
+    if (!ctx) return "";
+    ctx.drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
+    return crop.toDataURL("image/jpeg", 0.72);
+  };
+
+  const describeActions = (actions) => {
+    const list = dialog.querySelector(".editor-ai-action-list");
+    list.replaceChildren();
+    actions.forEach((action) => {
+      const item = document.createElement("li");
+      const parts = [`#${action.cmsId}`];
+      if (typeof action.text === "string") parts.push(`text → “${action.text.slice(0, 80)}${action.text.length > 80 ? "…" : ""}”`);
+      if (action.styles && Object.keys(action.styles).length) parts.push(`styles: ${Object.keys(action.styles).join(", ")}`);
+      if (typeof action.href === "string") parts.push(`href → ${action.href}`);
+      if (action.deleted) parts.push("hide element");
+      item.textContent = parts.join(" · ");
+      list.append(item);
+    });
+  };
+
+  const applyCursorActions = (actions) => {
+    let applied = 0;
+    actions.forEach((action) => {
+      const element = document.querySelector(`[data-cms-id="${CSS.escape(action.cmsId)}"]`);
+      if (!element) return;
+      editor.selectElement(element);
+      const edit = editor.currentEdit();
+      if (!edit) return;
+      if (typeof action.text === "string") {
+        edit.text = action.text;
+        element.textContent = action.text;
+        element.style.whiteSpace = "pre-line";
+      }
+      if (action.styles && typeof action.styles === "object") {
+        edit.styles ||= {};
+        Object.assign(edit.styles, action.styles);
+        editor.applyStyle(element, edit.styles);
+      }
+      if (typeof action.href === "string" && editor.isEditableLink?.(element)) {
+        edit.href = action.href;
+        element.setAttribute("href", action.href);
+      }
+      if (action.deleted === true) {
+        edit.deleted = true;
+        element.hidden = true;
+      }
+      applied += 1;
+    });
+    editor.saveDraft();
+    return applied;
+  };
+
+  const finishAiSelection = async (start, end) => {
     const left = Math.min(start.x, end.x);
     const right = Math.max(start.x, end.x);
     const top = Math.min(start.y, end.y);
     const bottom = Math.max(start.y, end.y);
-    const section = document.elementFromPoint(end.x, end.y)?.closest("main > section");
-    if (!section) {
-      status("Drag inside a page section to select its copy.", "error");
+    const width = right - left;
+    const height = bottom - top;
+    if (width < 18 || height < 18) {
+      status("Drag a larger region on the page.", "error");
       return;
     }
-    const candidates = [...section.querySelectorAll("h1,h2,h3,h4,p,.service-summary,.project-description,.step-copy")];
-    aiTarget = candidates.map((element) => {
-      const rect = element.getBoundingClientRect();
-      const area = Math.max(0, Math.min(right, rect.right) - Math.max(left, rect.left)) *
-        Math.max(0, Math.min(bottom, rect.bottom) - Math.max(top, rect.top));
-      return { element, area };
-    }).filter((candidate) => candidate.area > 0 && candidate.element.innerText.trim())
-      .sort((a, b) => b.area - a.area)[0]?.element;
-    if (!aiTarget) {
-      status("Drag over a heading or paragraph inside the section.", "error");
+    if (!document.elementFromPoint((left + right) / 2, (top + bottom) / 2)?.closest("main")) {
+      status("Drag across the page content to select a region.", "error");
       return;
     }
-    editor.selectElement(aiTarget);
-    dialog.querySelector(".editor-ai-context").textContent = `Selected copy: “${aiTarget.innerText.trim().slice(0, 180)}”`;
+    const elements = collectRegionElements(left, right, top, bottom);
+    if (!elements.length) {
+      status("No editable elements were inside that selection. Try a wider drag.", "error");
+      return;
+    }
+    status("Capturing region screenshot for Cursor AI…");
+    let screenshot = "";
+    try {
+      screenshot = await captureRegionScreenshot(left, top, width, height);
+    } catch {
+      screenshot = "";
+    }
+    aiRegion = { elements, screenshot, bounds: { left, top, width, height } };
+    pendingActions = [];
+    dialog.querySelector(".editor-ai-context").textContent =
+      `Selected ${elements.length} editable element${elements.length === 1 ? "" : "s"} in a ${Math.round(width)}×${Math.round(height)}px region.`;
+    if (screenshot) {
+      aiShot.src = screenshot;
+      aiShotWrap.hidden = false;
+    } else {
+      aiShot.removeAttribute("src");
+      aiShotWrap.hidden = true;
+    }
     dialog.querySelector("#editor-ai-prompt").value = "";
-    dialog.querySelector("#editor-ai-prompt").focus();
-    aiOptions.hidden = true;
+    aiPlan.hidden = true;
     aiApply.disabled = true;
+    aiStatus.textContent = screenshot
+      ? "Screenshot captured. Describe the change you want."
+      : "Screenshot unavailable; element context will still be sent. Describe the change you want.";
     dialog.showModal();
+    dialog.querySelector("#editor-ai-prompt").focus();
   };
 
   let selectionStart = null;
@@ -925,12 +1130,19 @@
   aiSelectButton.addEventListener("click", () => {
     selectionStart = null;
     document.body.classList.add("editor-ai-selecting");
-    status("Drag across the heading or paragraph you want Claude to improve.");
+    status("Drag across any part of the page to highlight a region for Cursor AI.");
   });
   document.addEventListener("pointerdown", (event) => {
     if (!document.body.classList.contains("editor-ai-selecting") || toolbar.contains(event.target) || event.target.closest("[data-cms-control]")) return;
-    if (!event.target.closest("main > section")) return;
-    selectionStart = { x: event.clientX, y: event.clientY };
+    if (!event.target.closest("main")) return;
+    const scroll = pageScroll();
+    // Store document-space points so mid-drag scrolling cannot shift the captured region.
+    selectionStart = {
+      docX: event.clientX + scroll.x,
+      docY: event.clientY + scroll.y,
+      x: event.clientX,
+      y: event.clientY,
+    };
     selectionBox.hidden = false;
     selectionBox.style.left = `${event.clientX}px`;
     selectionBox.style.top = `${event.clientY}px`;
@@ -940,16 +1152,23 @@
   }, true);
   document.addEventListener("pointermove", (event) => {
     if (!selectionStart) return;
-    const left = Math.min(selectionStart.x, event.clientX);
-    const top = Math.min(selectionStart.y, event.clientY);
+    const scroll = pageScroll();
+    const startX = selectionStart.docX - scroll.x;
+    const startY = selectionStart.docY - scroll.y;
+    const left = Math.min(startX, event.clientX);
+    const top = Math.min(startY, event.clientY);
     selectionBox.style.left = `${left}px`;
     selectionBox.style.top = `${top}px`;
-    selectionBox.style.width = `${Math.abs(event.clientX - selectionStart.x)}px`;
-    selectionBox.style.height = `${Math.abs(event.clientY - selectionStart.y)}px`;
+    selectionBox.style.width = `${Math.abs(event.clientX - startX)}px`;
+    selectionBox.style.height = `${Math.abs(event.clientY - startY)}px`;
   }, true);
   document.addEventListener("pointerup", (event) => {
     if (!selectionStart) return;
-    const start = selectionStart;
+    const scroll = pageScroll();
+    const start = {
+      x: selectionStart.docX - scroll.x,
+      y: selectionStart.docY - scroll.y,
+    };
     selectionStart = null;
     selectionBox.hidden = true;
     document.body.classList.remove("editor-ai-selecting");
@@ -957,63 +1176,58 @@
     event.preventDefault();
   }, true);
   dialog.querySelector("#editor-ai-prompt").addEventListener("input", () => {
-    aiOptions.hidden = true;
+    aiPlan.hidden = true;
     aiApply.disabled = true;
-    optionValues = [];
+    pendingActions = [];
   });
   aiGenerate.addEventListener("click", async () => {
-    if (!aiTarget) return;
+    if (!aiRegion?.elements?.length) return;
     const prompt = dialog.querySelector("#editor-ai-prompt").value.trim();
     if (!prompt) {
-      aiStatus.textContent = "Describe what you want to improve first.";
+      aiStatus.textContent = "Describe what you want Cursor AI to change first.";
       return;
     }
-    setBusy(aiGenerate, true, "Generating…");
-    aiStatus.textContent = "Asking Claude for three alternatives…";
+    setBusy(aiGenerate, true, "Asking Cursor AI…");
+    aiStatus.textContent = "Sending region screenshot and context to Cursor AI…";
     try {
-      const response = await fetch("/api/assist", {
+      const response = await fetch("/api/cursor-assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, selected_text: aiTarget.innerText }),
+        body: JSON.stringify({
+          prompt,
+          elements: aiRegion.elements,
+          screenshot: aiRegion.screenshot || "",
+        }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || `AI request failed (${response.status}).`);
-      optionValues = result.options;
-      const choices = aiOptions.querySelector("div");
-      choices.replaceChildren();
-      optionValues.forEach((option, index) => {
-        const label = document.createElement("label");
-        const radio = document.createElement("input");
-        radio.type = "radio";
-        radio.name = "editor-ai-option";
-        radio.value = String(index);
-        radio.checked = false;
-        const text = document.createElement("span");
-        text.textContent = option;
-        radio.addEventListener("change", () => { aiApply.disabled = false; });
-        label.append(radio, text);
-        choices.append(label);
-      });
-      aiOptions.hidden = false;
-      aiApply.disabled = true;
-      aiStatus.textContent = "Review the options. Nothing has changed yet.";
+      if (!response.ok) throw new Error(result.error || `Cursor AI request failed (${response.status}).`);
+      pendingActions = Array.isArray(result.actions) ? result.actions : [];
+      if (!pendingActions.length) throw new Error("Cursor AI returned no edits.");
+      dialog.querySelector(".editor-ai-summary").textContent = result.summary || "Proposed edits ready.";
+      describeActions(pendingActions);
+      aiPlan.hidden = false;
+      aiApply.disabled = false;
+      aiStatus.textContent = `Review ${pendingActions.length} proposed edit${pendingActions.length === 1 ? "" : "s"}. Nothing has changed yet.`;
     } catch (error) {
       aiStatus.textContent = error.message;
+      aiPlan.hidden = true;
+      aiApply.disabled = true;
+      pendingActions = [];
     } finally {
-      setBusy(aiGenerate, false, "Generate three options");
+      setBusy(aiGenerate, false, "Ask Cursor AI");
     }
   });
   aiApply.addEventListener("click", () => {
-    const option = dialog.querySelector('input[name="editor-ai-option"]:checked');
-    if (!aiTarget || !option || !optionValues[Number(option.value)]) return;
-    const text = optionValues[Number(option.value)];
-    const edit = editor.currentEdit();
-    edit.text = text;
-    aiTarget.textContent = text;
-    aiTarget.style.whiteSpace = "pre-line";
-    editor.saveDraft();
+    if (!pendingActions.length) return;
+    const applied = applyCursorActions(pendingActions);
+    if (aiRegion?.screenshot) {
+      aiShot.removeAttribute("src");
+      aiRegion.screenshot = "";
+    }
     dialog.close();
-    status("Selected AI copy applied to the draft. Select Update website to publish it.");
+    status(applied
+      ? `Applied ${applied} Cursor AI edit${applied === 1 ? "" : "s"} to the draft. Select Update website to publish.`
+      : "Cursor AI edits could not be matched to page elements.", applied ? "" : "error");
   });
 
   const refreshSelectedControls = () => {
