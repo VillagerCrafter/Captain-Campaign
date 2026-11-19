@@ -42,15 +42,7 @@
         "offsetY": 0
       },
       "media": "/uploads/f88a133e5772121f7d16e12674ac32dc.jpg",
-      "alt": "Event Crowds - Nintendo Wii U Experience",
-      "credit": {
-        "title": "Event Crowds - Nintendo Wii U Experience",
-        "creator": "HighTechDad",
-        "license": "by",
-        "license_version": "2.0",
-        "license_url": "https://creativecommons.org/licenses/by/2.0/",
-        "source_url": "https://www.flickr.com/photos/22473198@N00/8044043939"
-      }
+      "deleted": true
     },
     "content-block-dff561a6-18cb-4d81-ba61-40a221ec53d5": {
       "styles": {},
@@ -71,13 +63,11 @@
     },
     "element-256-a": {
       "styles": {},
-      "text": "Event Crowds - Nintendo Wii U Experience by HighTechDad"
+      "deleted": true,
+      "text": ""
     },
     "content-block-0b7e85d0-76bf-4eff-b206-4f161e8e2743": {
-      "styles": {
-        "left": 0,
-        "top": 0
-      },
+      "styles": {},
       "text": "Write your text here.",
       "deleted": true
     },
@@ -687,11 +677,61 @@
       "styles": {},
       "deleted": true
     },
-    "element-321-a": {
+    "project-tiresplus-anniversary-image": {
+      "styles": {},
+      "media": "/uploads/dc881f4e6f8d0f7903b22ab10306be17.jpg",
+      "crop": {
+        "fit": "cover",
+        "x": 63,
+        "y": 30,
+        "zoom": 220
+      }
+    },
+    "element-329-img": {
+      "styles": {
+        "zIndex": 0
+      },
+      "media": "/uploads/e56484b56a61de3e3665584ab570712b.jpg"
+    },
+    "element-380-img": {
+      "styles": {},
+      "crop": {
+        "fit": "cover",
+        "x": 55,
+        "y": 38,
+        "zoom": 100
+      }
+    },
+    "element-392-img": {
+      "styles": {},
+      "crop": {
+        "fit": "cover",
+        "x": 50,
+        "y": 23,
+        "zoom": 100
+      }
+    },
+    "element-376-img": {
+      "styles": {},
+      "crop": {
+        "fit": "cover",
+        "x": 50,
+        "y": 50,
+        "zoom": 156
+      },
+      "media": "/uploads/ceaff556749dff7192cd602b4339e534.jpg"
+    },
+    "portfolio-grid": {
+      "styles": {
+        "left": 7,
+        "top": 0
+      }
+    },
+    "element-330-a": {
       "styles": {},
       "deleted": true
     },
-    "element-320-a": {
+    "element-331-a": {
       "styles": {},
       "deleted": true
     }
@@ -701,15 +741,7 @@
   "sectionOrder": [],
   "projects": [],
   "services": [],
-  "contentBlocks": [
-    {
-      "id": "content-block-dff561a6-18cb-4d81-ba61-40a221ec53d5",
-      "sectionId": "work",
-      "type": "image",
-      "image": "/uploads/eb2b96d2adc8d4b888fcb9d99d67790a.jpg",
-      "alt": "737730154_4386715828261539_3131252256026975687_n"
-    }
-  ],
+  "contentBlocks": [],
   "elementCopies": [],
   "buttons": [],
   "mediaElements": [],
