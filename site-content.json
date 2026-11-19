@@ -74,8 +74,12 @@
       "text": "Event Crowds - Nintendo Wii U Experience by HighTechDad"
     },
     "content-block-0b7e85d0-76bf-4eff-b206-4f161e8e2743": {
-      "styles": {},
-      "text": "Write your text here."
+      "styles": {
+        "left": 0,
+        "top": 0
+      },
+      "text": "Write your text here.",
+      "deleted": true
     },
     "element-31-div": {
       "styles": {
@@ -683,55 +687,13 @@
       "styles": {},
       "deleted": true
     },
-    "project-tiresplus-anniversary-image": {
+    "element-321-a": {
       "styles": {},
-      "media": "/uploads/dc881f4e6f8d0f7903b22ab10306be17.jpg",
-      "crop": {
-        "fit": "cover",
-        "x": 63,
-        "y": 30,
-        "zoom": 220
-      }
+      "deleted": true
     },
-    "element-329-img": {
-      "styles": {
-        "zIndex": 0
-      },
-      "media": "/uploads/e56484b56a61de3e3665584ab570712b.jpg"
-    },
-    "element-380-img": {
+    "element-320-a": {
       "styles": {},
-      "crop": {
-        "fit": "cover",
-        "x": 55,
-        "y": 38,
-        "zoom": 100
-      }
-    },
-    "element-392-img": {
-      "styles": {},
-      "crop": {
-        "fit": "cover",
-        "x": 50,
-        "y": 23,
-        "zoom": 100
-      }
-    },
-    "element-376-img": {
-      "styles": {},
-      "crop": {
-        "fit": "cover",
-        "x": 50,
-        "y": 50,
-        "zoom": 156
-      },
-      "media": "/uploads/ceaff556749dff7192cd602b4339e534.jpg"
-    },
-    "portfolio-grid": {
-      "styles": {
-        "left": 7,
-        "top": 0
-      }
+      "deleted": true
     }
   },
   "sections": [],
@@ -746,12 +708,6 @@
       "type": "image",
       "image": "/uploads/eb2b96d2adc8d4b888fcb9d99d67790a.jpg",
       "alt": "737730154_4386715828261539_3131252256026975687_n"
-    },
-    {
-      "id": "content-block-0b7e85d0-76bf-4eff-b206-4f161e8e2743",
-      "sectionId": "work",
-      "type": "text",
-      "text": "Write your text here."
     }
   ],
   "elementCopies": [],
