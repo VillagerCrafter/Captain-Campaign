@@ -100,7 +100,7 @@ layout: null
         </div>
       </section>
 
-      <section class="intro section-pad page-width" aria-labelledby="intro-title">
+      <section class="intro section-pad page-width" id="intro" aria-labelledby="intro-title">
         <div class="intro-label">
           <span class="section-number">01 / THE OPPORTUNITY</span>
           <span class="mini-rule" aria-hidden="true"></span>
@@ -116,7 +116,7 @@ layout: null
         </div>
       </section>
 
-      <section class="story-section section-pad" aria-labelledby="story-title">
+      <section class="story-section section-pad" id="story" aria-labelledby="story-title">
         <div class="page-width">
           <div class="section-heading">
             <div>
@@ -229,7 +229,7 @@ layout: null
           <button type="button" class="filter-button" data-filter="content" aria-pressed="false">Content</button>
           <button type="button" class="filter-button" data-filter="hosting" aria-pressed="false">Hosting</button>
         </div>
-        <div class="portfolio-grid">
+        <div class="portfolio-grid" id="portfolio-grid">
           {% for project in site.data.projects %}
           <article class="project-card" id="project-{{ project.id }}" data-category="{{ project.category }}"
             data-project-url="{{ '/projects/' | relative_url }}?project={{ project.id }}" role="link" tabindex="0"
@@ -244,6 +244,11 @@ layout: null
             <p class="project-role"><span>MY ROLE</span>{{ project.role }}</p>
           </article>
           {% endfor %}
+        </div>
+        <div class="portfolio-more-wrap">
+          <button type="button" class="portfolio-more text-link" id="portfolio-show-more" hidden aria-expanded="false" aria-controls="portfolio-grid">
+            Show more <span aria-hidden="true">↘</span>
+          </button>
         </div>
         <p class="portfolio-empty" hidden>No projects in this category yet.</p>
       </section>
@@ -315,7 +320,7 @@ layout: null
         </div>
       </section>
 
-      <section class="featured-section section-pad page-width" aria-labelledby="featured-title">
+      <section class="featured-section section-pad page-width" id="featured" aria-labelledby="featured-title">
         <div class="featured-heading">
           <div><span class="section-number">09 / FEATURED MOMENTS</span><h2 id="featured-title">A few stories worth <em>another look.</em></h2></div>
           <div class="carousel-controls">

@@ -430,6 +430,23 @@
     const section = document.getElementById(block.sectionId);
     if (!section || !/^content-block-[\w-]+$/.test(block.id || "") ||
         document.getElementById(block.id)) return;
+    if (block.type === "video") {
+      const src = block.src || block.image || "";
+      if (!/^\/uploads\/[\w.-]+$/.test(src)) return;
+      const element = document.createElement("div");
+      element.className = "cms-added-content-block cms-added-video cms-published-addition";
+      element.id = block.id;
+      element.dataset.cmsId = block.id;
+      const video = document.createElement("video");
+      video.dataset.cmsId = `${block.id}-image`;
+      video.src = resolveSitePath(src);
+      video.controls = true;
+      video.playsInline = true;
+      if (typeof block.alt === "string" && block.alt) video.setAttribute("aria-label", block.alt);
+      element.append(video);
+      section.append(element);
+      return;
+    }
     const isImage = block.type === "image";
     const element = isImage ? document.createElement("figure") :
       document.createElement(block.type === "heading" ? "h3" : "p");
@@ -587,6 +604,8 @@
     card.querySelector(".project-role").append(document.createTextNode(project.role || ""));
     card.dataset.cmsId = `project-${project.id}`;
     grid.append(card);
+    document.dispatchEvent(new CustomEvent("cms-portfolio-changed"));
+    window.liamPortfolio?.refresh?.();
   };
 
   const renderSection = (section) => {
@@ -986,14 +1005,12 @@
       if (button.dataset.cmsFilterBound) return;
       button.dataset.cmsFilterBound = "true";
       button.addEventListener("click", () => {
-        const filter = document.querySelector(".filter-button.is-active")?.dataset.filter || "all";
-        const customCards = [...document.querySelectorAll(".project-card[id^='project-custom-']")];
-        customCards.forEach((card) => { card.hidden = filter !== "all" && card.dataset.category !== filter; });
-        const visibleCards = [...document.querySelectorAll(".project-card")].filter((card) => !card.hidden);
-        const emptyMessage = document.querySelector(".portfolio-empty");
-        if (emptyMessage) emptyMessage.hidden = visibleCards.length > 0;
+        document.dispatchEvent(new CustomEvent("cms-portfolio-changed"));
+        window.liamPortfolio?.refresh?.();
       });
     });
+    document.dispatchEvent(new CustomEvent("cms-portfolio-changed"));
+    window.liamPortfolio?.refresh?.();
     injectCustomPageNav(rawContent);
   };
 

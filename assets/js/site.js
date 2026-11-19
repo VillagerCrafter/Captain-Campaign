@@ -201,9 +201,72 @@
   const filterButtons = document.querySelectorAll(".filter-button");
   const emptyMessage = document.querySelector(".portfolio-empty");
   const portfolioGrid = document.querySelector(".portfolio-grid");
+  const portfolioShowMore = document.querySelector("#portfolio-show-more");
+  const PORTFOLIO_PAGE_SIZE = 9;
+  let portfolioExpanded = false;
 
   const openProjectPage = (card) => {
     if (card?.dataset.projectUrl) window.location.assign(card.dataset.projectUrl);
+  };
+
+  const activePortfolioFilter = () => (
+    document.querySelector(".filter-button.is-active")?.dataset.filter || "all"
+  );
+
+  const portfolioCards = () => [...document.querySelectorAll(".portfolio-grid .project-card")];
+
+  const matchingPortfolioCards = (filter = activePortfolioFilter()) => (
+    portfolioCards().filter((card) => filter === "all" || card.dataset.category === filter)
+  );
+
+  // Public pages show 9 projects at a time. CMS edit mode always shows the full list.
+  const applyPortfolioVisibility = () => {
+    const filter = activePortfolioFilter();
+    const cards = portfolioCards();
+    const matching = matchingPortfolioCards(filter);
+    const showAll = portfolioExpanded || isCmsEditing();
+
+    cards.forEach((card) => {
+      const matches = filter === "all" || card.dataset.category === filter;
+      if (!matches) {
+        card.hidden = true;
+        return;
+      }
+      if (showAll) {
+        card.hidden = false;
+        return;
+      }
+      card.hidden = matching.indexOf(card) >= PORTFOLIO_PAGE_SIZE;
+    });
+
+    if (emptyMessage) emptyMessage.hidden = matching.length > 0;
+
+    if (portfolioShowMore) {
+      const overflow = matching.length > PORTFOLIO_PAGE_SIZE;
+      const showToggle = overflow && !isCmsEditing();
+      portfolioShowMore.hidden = !showToggle;
+      portfolioShowMore.setAttribute("aria-expanded", String(portfolioExpanded && showToggle));
+      if (portfolioExpanded) {
+        portfolioShowMore.innerHTML = 'Show less <span aria-hidden="true">↗</span>';
+      } else {
+        const remaining = Math.max(0, matching.length - PORTFOLIO_PAGE_SIZE);
+        portfolioShowMore.innerHTML = remaining
+          ? `Show more <span class="portfolio-more-count">(${remaining})</span> <span aria-hidden="true">↘</span>`
+          : 'Show more <span aria-hidden="true">↘</span>';
+      }
+    }
+  };
+
+  const revealPortfolioCard = (card) => {
+    if (!(card instanceof HTMLElement)) return;
+    const filter = activePortfolioFilter();
+    if (filter !== "all" && card.dataset.category && card.dataset.category !== filter) {
+      document.querySelector('.filter-button[data-filter="all"]')?.click();
+    }
+    if (card.hidden) {
+      portfolioExpanded = true;
+      applyPortfolioVisibility();
+    }
   };
 
   portfolioGrid?.addEventListener("click", (event) => {
@@ -223,24 +286,37 @@
 
   filterButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      const filter = button.dataset.filter;
-      let visibleCount = 0;
-
       filterButtons.forEach((filterButton) => {
         const isActive = filterButton === button;
         filterButton.classList.toggle("is-active", isActive);
         filterButton.setAttribute("aria-pressed", String(isActive));
       });
-
-      document.querySelectorAll(".project-card").forEach((card) => {
-        const isVisible = filter === "all" || card.dataset.category === filter;
-        card.hidden = !isVisible;
-        if (isVisible) visibleCount += 1;
-      });
-
-      if (emptyMessage) emptyMessage.hidden = visibleCount > 0;
+      // Changing category collapses back to the first page of that filter.
+      portfolioExpanded = false;
+      applyPortfolioVisibility();
     });
   });
+
+  portfolioShowMore?.addEventListener("click", () => {
+    portfolioExpanded = !portfolioExpanded;
+    applyPortfolioVisibility();
+    if (!portfolioExpanded) {
+      document.querySelector("#work")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  });
+
+  applyPortfolioVisibility();
+  document.addEventListener("cms-portfolio-changed", applyPortfolioVisibility);
+  window.liamPortfolio = {
+    pageSize: PORTFOLIO_PAGE_SIZE,
+    refresh: applyPortfolioVisibility,
+    reveal: revealPortfolioCard,
+    get expanded() { return portfolioExpanded; },
+    setExpanded: (value) => {
+      portfolioExpanded = Boolean(value);
+      applyPortfolioVisibility();
+    },
+  };
 
   const slides = Array.from(document.querySelectorAll(".featured-slide"));
   const dots = Array.from(document.querySelectorAll(".carousel-dot"));
@@ -290,7 +366,7 @@
     slides.forEach((slide) => {
       slide.addEventListener("click", () => {
         const target = document.querySelector(slide.hash);
-        if (target?.hidden) document.querySelector('.filter-button[data-filter="all"]')?.click();
+        if (target) revealPortfolioCard(target);
       });
     });
     carousel.addEventListener("mouseenter", stopCarousel);

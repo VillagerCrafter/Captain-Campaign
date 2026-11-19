@@ -61,6 +61,24 @@
   alt: Liam at the Coca-Cola and Big Ten kickoff event
   description: A Coca-Cola brand presence at a Big Ten Network kickoff, connecting with fans in a lively college sports setting.
   role: Brand ambassador and event-day guest engagement.
+- id: big-ten-tailgate
+  title: Big Ten Network Tailgate
+  client: Big Ten Network / Indeed / Eckrich
+  location: Minneapolis, MN
+  category: activation
+  image: /assets/images/big-ten-tailgate.jpg
+  alt: Liam at the Big Ten Network B1G Tailgate activation ahead of Iowa vs Gophers
+  description: Worked the Big Ten Network promotion at Gopher Garden ahead of Iowa vs. Minnesota, alongside Indeed and Eckrich. Kept fans moving through giveaways like free tailgate towels, reaction-time and football-toss games, plus Blue Diamond Almonds and Eckrich sampling.
+  role: Brand ambassador and game-day guest engagement.
+- id: lynne-experience
+  title: Lynne Experience Cub Foods Sampling
+  client: Lynne Experience
+  location: Stillwater, MN
+  category: activation
+  image: /assets/images/lynne-experience.jpg
+  alt: Portrait used for Lynne Experience Cub Foods sampling work
+  description: Solo Cub Foods sampling events in Stillwater for brands including Kemp's Protein, Smithfield Pork Butt Burnt Ends, Tazo Tea, and Little Leaf & Jimmy's. Handled footprint purchase, setup and teardown, product sampling and sales, plus photo, inventory, pricing, and traffic notes for metric-based client reports.
+  role: Solo brand ambassador, footprint lead, sampling/sales, and client reporting.
 - id: samsons-tour
   title: Samson's Grapes Tour
   client: Samson's Grapes
@@ -88,3 +106,48 @@
   alt: Target Together brand activation in Minnesota
   description: An event-day brand experience captured in the Target Together Minnesota photo collection.
   role: Brand representation and on-site activation support.
+- id: dude-wipes-hot-chocolate
+  title: Dude Wipes at the Skechers Hot Chocolate Run
+  client: Dude Wipes / Skechers
+  location: Minneapolis, MN
+  category: activation
+  image: /assets/images/dude-wipes-hot-chocolate.jpg
+  alt: Brand ambassadors holding Dude Wipes samples at the Hot Chocolate Run
+  description: Setup and teardown of the Dude Wipes footprint for the Minneapolis Skechers Hot Chocolate Run, plus on-site marketing footage of runner testimonials. More than 1,000 Dude Wipes samples were handed out to marathon participants.
+  role: Activation setup, teardown, guest sampling, and marketing content capture.
+- id: mojo-country-jam
+  title: Mojo at Country Jam
+  client: Mojo
+  location: Eau Claire, WI
+  category: activation
+  image: /assets/images/mojo-country-jam.jpg
+  alt: Mojo energy pouches promoted to the Country Jam festival crowd
+  description: Promoted Mojo caffeine energy pouches to more than 24,000 Country Jam attendees in Eau Claire. Over 1,000 fans were pitched into Mojo's onsite experience, with full footprint setup and teardown support including heavy inventory moves.
+  role: Brand ambassador, guest pitching, and activation labor support.
+- id: tamagotchi-tour
+  title: Tamagotchi Tour
+  client: Tamagotchi / Bandai Namco
+  location: Bloomington, MN
+  category: tour
+  image: /assets/images/tamagotchi-tour.jpg
+  alt: Tamagotchi tour team posing inside a branded van cutout at the mall activation
+  description: Represented Tamagotchi as a brand ambassador with fan activities and Gashapon engagement. Drove about $3,600 in B2C revenue through $3 token sales for Bandai Namco Gashapon machines.
+  role: Brand ambassador, guest engagement, and on-site product sales.
+- id: kings-hawaiian-vikings
+  title: King's Hawaiian NFL Tailgate Tour
+  client: King's Hawaiian
+  location: Minneapolis, MN
+  category: activation
+  image: /assets/images/kings-hawaiian-vikings.jpg
+  alt: King's Hawaiian Vikings game-day activation with football toss lanes and stadium crowd
+  description: Brand ambassador for King's Hawaiian's 2026 NFL Tailgate Tour at Vikings home games versus the Colts and Bills. Energized guests through a paired football-toss game, free samples, and giveaways including a Pit Boss grill and King's Hawaiian slider moments.
+  role: Brand ambassador, guest engagement, sampling, and game-day activation support.
+- id: tiresplus-anniversary
+  title: TiresPlus 50th Anniversary
+  client: TiresPlus
+  location: Elko Speedway, MN
+  category: activation
+  image: /assets/images/tiresplus-anniversary.jpg
+  alt: Placeholder image for the TiresPlus 50th anniversary activation at Elko Speedway
+  description: Represented TiresPlus at their anniversary celebration at Elko Speedway, covering multiple brand-ambassador roles when staffing ran short and helping hundreds of visitors find and join the car show, live music, and movie showing.
+  role: Brand ambassador and on-site guest engagement across understaffed activation zones.
